@@ -1,0 +1,22 @@
+[
+  {
+    "id": "1",
+    "name": "Medicine",
+    "icon_path": "assets/images/medicine.png"
+  },
+  {
+    "id": "2",
+    "name": "Cardiologist",
+    "icon_path": "assets/images/cardiologist.png"
+  },
+  {
+    "id": "3",
+    "name": "Neurologist",
+    "icon_path": "assets/images/neuro.png"
+  },
+  {
+    "id": "4",
+    "name": "General",
+    "icon_path": "assets/images/medicine.png"
+  }
+]
