@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:intl/intl.dart';
-import 'package:medisafe/core/components.dart';
 import 'package:medisafe/core/primary_color.dart';
 import 'package:medisafe/features/home/patient/presentation/screens/prescription/prescribe_medicine.dart';
 
@@ -54,9 +53,6 @@ class PatientProfileForConsultancy extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         const SizedBox(height: 20),
-                        // ---------------------------
-                        // PATIENT PROFILE
-                        // ---------------------------
                         CircleAvatar(
                           radius: 60,
                           backgroundColor: Colors.grey[200],
@@ -85,16 +81,8 @@ class PatientProfileForConsultancy extends ConsumerWidget {
                           style: TextStyle(color: Colors.grey[600]),
                         ),
                         const SizedBox(height: 20),
-
-                        // ---------------------------
-                        // ACTION BUTTONS (CALLS)
-                        // ---------------------------
                         _buildActionButtons(context, contact, patientId),
                         const SizedBox(height: 30),
-
-                        // ---------------------------
-                        // MEDICAL HISTORY (PRESCRIPTIONS)
-                        // ---------------------------
                         const Text(
                           "Medical History:",
                           style: TextStyle(
@@ -104,10 +92,6 @@ class PatientProfileForConsultancy extends ConsumerWidget {
                         ),
                         _buildPrescriptionHistory(context),
                         const SizedBox(height: 30),
-
-                        // ---------------------------
-                        // APPOINTMENTS LIST
-                        // ---------------------------
                         const Text(
                           "Appointments:",
                           style: TextStyle(
@@ -117,11 +101,6 @@ class PatientProfileForConsultancy extends ConsumerWidget {
                         ),
                         _buildAppointmentList(context),
                         const SizedBox(height: 30),
-
-                        // ---------------------------
-                        // PRESCRIBE MEDICINE BUTTON
-                        // ---------------------------
-                        _buildPrescribeMedicineButton(context),
                       ],
                     ),
                   ),
@@ -134,9 +113,6 @@ class PatientProfileForConsultancy extends ConsumerWidget {
     );
   }
 
-  // -----------------------------------
-  // REAL-TIME MEDICAL HISTORY
-  // -----------------------------------
   Widget _buildPrescriptionHistory(BuildContext context) {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
@@ -186,15 +162,12 @@ class PatientProfileForConsultancy extends ConsumerWidget {
                       final medicineName = med['medicine'] ?? '';
                       final dosage = med['dosage'] ?? '';
                       final advice = med['advice'] ?? '';
-
-                      // Attempt to read 'times' as a list
                       final timesData = med['times'];
                       List<String> timesList = [];
 
                       if (timesData is List) {
                         timesList = timesData.map((e) => e.toString()).toList();
                       } else {
-                        // If no 'times' list, fall back to 'time'
                         final singleTime = med['time'] ?? '';
                         if (singleTime.isNotEmpty) {
                           timesList = [singleTime];
@@ -233,17 +206,13 @@ class PatientProfileForConsultancy extends ConsumerWidget {
 
         final now = DateTime.now();
 
-        // Filter to only future pending appointments
         final filteredDocs = snapshot.data!.docs.where((doc) {
           final data = doc.data() as Map<String, dynamic>;
           final status = data['status'] ?? '';
           final dateStr = data['date'] ?? '';
           final timeStr = data['timeSlot'] ?? '';
-
-          // Only pending
           if (status != 'Pending') return false;
 
-          // Parse datetime
           try {
             final fullStr = "$dateStr $timeStr";
             final appointmentTime =
@@ -270,11 +239,31 @@ class PatientProfileForConsultancy extends ConsumerWidget {
             final status = data['status'] ?? 'Scheduled';
 
             return Card(
+              color: Colors.white,
               margin: const EdgeInsets.symmetric(vertical: 8),
               child: ListTile(
                 title: Text("Date: $date\nTime: $timeSlot"),
                 subtitle: Text("Status: $status"),
-                trailing: _buildVisitButton(doc.id, status),
+                trailing: ElevatedButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => PrescriptionFormScreen(
+                          patientId: patientId,
+                          appointmentId: doc.id,
+                          doctorId: data[
+                              'doctorId'], // Ensure doctorId is fetched properly from appointment doc
+                          doctorName:
+                              data['doctorName'], // Also fetch doctorName
+                        ),
+                      ),
+                    );
+                  },
+                  style:
+                      ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+                  child: const Text("Visit"),
+                ),
               ),
             );
           },
@@ -283,37 +272,6 @@ class PatientProfileForConsultancy extends ConsumerWidget {
     );
   }
 
-  // Build the "Visit" button (or "Visited" if already visited).
-  Widget _buildVisitButton(String docId, String status) {
-    if (status == 'Visited') {
-      // Already visited -> disable button and show green color
-      return ElevatedButton(
-        onPressed: null, // Disabled
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.green,
-        ),
-        child: const Text("Visited"),
-      );
-    } else {
-      // Not visited -> show "Visit" button
-      return ElevatedButton(
-        onPressed: () async {
-          await FirebaseFirestore.instance
-              .collection('appointments')
-              .doc(docId)
-              .update({'status': 'Visited'});
-        },
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.orange,
-        ),
-        child: const Text("Visit"),
-      );
-    }
-  }
-
-  // -----------------------------------
-  // ACTION BUTTONS (Voice/Video Call)
-  // -----------------------------------
   Widget _buildActionButtons(
       BuildContext context, String callerName, String callerImageUrl) {
     return Row(
@@ -323,57 +281,20 @@ class PatientProfileForConsultancy extends ConsumerWidget {
           icon: FontAwesomeIcons.phone,
           label: "Voice Call",
           color: Colors.blue,
-          onPressed: () {
-            // TODO: Navigate to your voice call screen
-          },
+          onPressed: () {},
         ),
         const SizedBox(width: 40),
         _ActionButton(
           icon: FontAwesomeIcons.video,
           label: "Video Call",
           color: Colors.purple,
-          onPressed: () {
-            // TODO: Navigate to your video call screen
-          },
+          onPressed: () {},
         ),
       ],
     );
   }
-
-  // -----------------------------------
-  // PRESCRIBE MEDICINE BUTTON
-  // -----------------------------------
-  Widget _buildPrescribeMedicineButton(BuildContext context) {
-    return SizedBox(
-        width: double.infinity,
-        child: ElevatedButton(
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) =>
-                    PrescriptionFormScreen(patientId: patientId),
-              ),
-            );
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.buttonColor,
-            padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 12),
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          ),
-          child: Pacifico(
-            text: "Prescribe Medicine",
-            size: 18.0,
-            color: AppColors.appColor,
-          ),
-        ));
-  }
 }
 
-// -----------------------------------
-// Reusable Action Button
-// -----------------------------------
 class _ActionButton extends StatelessWidget {
   final IconData icon;
   final String label;

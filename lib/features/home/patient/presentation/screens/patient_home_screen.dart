@@ -2,14 +2,33 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:medisafe/core/components.dart';
 import 'package:medisafe/core/primary_color.dart';
+import 'package:medisafe/features/authentication/patient/presentation/controllers/notifications_controller.dart';
 import 'package:medisafe/features/home/doctor/presentation/controllers/categories_controller.dart';
 import 'package:medisafe/features/home/doctor/presentation/controllers/doctors_controller.dart';
+
 import 'package:medisafe/features/home/doctor/presentation/screens/doctor_details_screen.dart';
 import 'package:medisafe/features/home/patient/presentation/screens/CategoryDoctorsScreen.dart';
+import 'package:medisafe/features/home/patient/presentation/screens/notification/notifications_screen.dart';
 import 'package:medisafe/features/home/patient/presentation/screens/search_doctor_screen.dart';
 import 'package:medisafe/features/home/patient/presentation/widgets/customBottomNavigationBar.dart';
 import 'package:medisafe/models/category_model.dart';
 import 'package:medisafe/models/doctor_model.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+bool _shouldShowBadge(DateTime latestNotificationTime) {
+  final now = DateTime.now();
+
+  // read from SharedPreferences
+  SharedPreferences.getInstance().then((prefs) {
+    final lastSeenMillis = prefs.getInt('last_seen_notification_time') ?? 0;
+    final lastSeenTime = DateTime.fromMillisecondsSinceEpoch(lastSeenMillis);
+
+    // Check if latest notification is newer than last seen
+    return latestNotificationTime.isAfter(lastSeenTime);
+  });
+
+  return true; // default true if no data found
+}
 
 class PatientHomeScreen extends ConsumerWidget {
   const PatientHomeScreen({super.key});
@@ -18,10 +37,27 @@ class PatientHomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final doctorsState = ref.watch(doctorsControllerProvider);
     final categoriesState = ref.watch(categoriesControllerProvider);
+    final notificationStream = ref.watch(notificationProvider);
+
+    ref.listen(notificationProvider, (previous, next) {
+      final previousValue = previous?.value ?? 0;
+      final nextValue = next.value ?? 0;
+
+      if (nextValue > previousValue) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("🔔 New Notification! Check your notifications"),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    });
 
     return Scaffold(
       backgroundColor: AppColors.appColor,
-      appBar: _buildAppBar(context),
+      appBar: _buildAppBar(context, ref),
       body: LayoutBuilder(
         builder: (context, constraints) {
           bool isWeb = constraints.maxWidth > 600; // Detects web layout
@@ -46,7 +82,9 @@ class PatientHomeScreen extends ConsumerWidget {
     );
   }
 
-  AppBar _buildAppBar(BuildContext context) {
+  AppBar _buildAppBar(BuildContext context, WidgetRef ref) {
+    final notificationCountAsync = ref.watch(notificationProvider);
+
     return AppBar(
       backgroundColor: Colors.transparent,
       elevation: 0,
@@ -59,13 +97,55 @@ class PatientHomeScreen extends ConsumerWidget {
             Navigator.push(
               context,
               MaterialPageRoute(
-                  builder: (context) => const SearchDoctorScreen()),
+                builder: (context) => const SearchDoctorScreen(),
+              ),
             );
           },
         ),
-        IconButton(
-          icon: const Icon(Icons.notifications_outlined, color: Colors.black),
-          onPressed: () {},
+        notificationCountAsync.when(
+          data: (count) {
+            return Stack(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.notifications_none,
+                      color: Colors.black, size: 28),
+                  onPressed: () {
+                    ref.invalidate(notificationProvider); // reset on tap
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const NotificationScreen(),
+                      ),
+                    );
+                  },
+                ),
+                if (count > 0)
+                  Positioned(
+                    right: 6,
+                    top: 6,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      padding: const EdgeInsets.all(5),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 1.5),
+                      ),
+                      child: Text(
+                        count > 9 ? '9+' : '$count',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
+          loading: () => const CircularProgressIndicator(),
+          error: (e, stack) => const Icon(Icons.error, color: Colors.red),
         ),
       ],
     );
