@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:medisafe/features/home/patient/presentation/controllers/search_doctor_controller.dart';
 import 'package:medisafe/features/home/patient/presentation/screens/filtered_doctors_screen.dart';
 import 'package:medisafe/models/search_filter_model.dart';
-import 'package:intl/intl.dart';
 
 class SearchDoctorScreen extends ConsumerStatefulWidget {
   const SearchDoctorScreen({super.key});
@@ -15,26 +14,26 @@ class SearchDoctorScreen extends ConsumerStatefulWidget {
 class _SearchDoctorScreenState extends ConsumerState<SearchDoctorScreen> {
   final TextEditingController _areaController = TextEditingController();
   String? _selectedCategory;
-  DateTime? _selectedDate;
+  //DateTime? _selectedDate;
 
-  void _pickDate() async {
-    DateTime? pickedDate = await showDatePicker(
-      context: context,
-      initialDate: DateTime.now(),
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
-    );
+  // void _pickDate() async {
+  //   DateTime? pickedDate = await showDatePicker(
+  //     context: context,
+  //     initialDate: DateTime.now(),
+  //     firstDate: DateTime.now(),
+  //     lastDate: DateTime.now().add(const Duration(days: 365)),
+  //   );
 
-    setState(() {
-      _selectedDate = pickedDate;
-    });
-    }
+  //   setState(() {
+  //     _selectedDate = pickedDate;
+  //   });
+  // }
 
   void _performSearch() {
     final filter = SearchFilter(
       area: _areaController.text,
       category: _selectedCategory,
-      date: _selectedDate,
+      //date: _selectedDate,
     );
     Navigator.push(
       context,
@@ -134,30 +133,30 @@ class _SearchDoctorScreenState extends ConsumerState<SearchDoctorScreen> {
                       fillColor: Colors.grey[100],
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    "Select Date",
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  GestureDetector(
-                    onTap: _pickDate,
-                    child: AbsorbPointer(
-                      child: TextFormField(
-                        decoration: InputDecoration(
-                          hintText: _selectedDate == null
-                              ? "Select Date"
-                              : DateFormat('yyyy-MM-dd').format(_selectedDate!),
-                          prefixIcon: const Icon(Icons.calendar_today_outlined),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          filled: true,
-                          fillColor: Colors.grey[100],
-                        ),
-                      ),
-                    ),
-                  ),
+                  // const SizedBox(height: 16),
+                  // const Text(
+                  //   "Select Date",
+                  //   style: TextStyle(fontWeight: FontWeight.bold),
+                  // ),
+                  // const SizedBox(height: 8),
+                  // GestureDetector(
+                  //   onTap: _pickDate,
+                  //   child: AbsorbPointer(
+                  //     child: TextFormField(
+                  //       decoration: InputDecoration(
+                  //         hintText: _selectedDate == null
+                  //             ? "Select Date"
+                  //             : DateFormat('yyyy-MM-dd').format(_selectedDate!),
+                  //         prefixIcon: const Icon(Icons.calendar_today_outlined),
+                  //         border: OutlineInputBorder(
+                  //           borderRadius: BorderRadius.circular(8),
+                  //         ),
+                  //         filled: true,
+                  //         fillColor: Colors.grey[100],
+                  //       ),
+                  //     ),
+                  //   ),
+                  // ),
                 ],
               ),
             ),
