@@ -67,26 +67,4 @@ class Doctor {
       'profile_image_url': profileImageUrl,
     };
   }
-
-  // Future<void> addDoctorToFirestore() async {
-  //   try {
-  //     final doctorRef =
-  //         FirebaseFirestore.instance.collection('doctors').doc(id);
-
-  //     // Set the main doctor document
-  //     await doctorRef.set(toMap());
-
-  //     // Create subcollection 'doctorId' under the doctor document
-  //     await doctorRef.collection('doctorId').add({
-  //       'available_slots': {
-  //         '2024-11-01': ['09:00 AM', '10:00 AM'],
-  //         '2024-11-02': ['02:00 PM', '03:00 PM'],
-  //       },
-  //     });
-
-  //     print('Doctor and doctorId subcollection added successfully!');
-  //   } catch (e) {
-  //     print('Error adding doctor to Firestore: $e');
-  //   }
-  // }
 }

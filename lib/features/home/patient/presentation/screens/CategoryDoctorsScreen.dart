@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:medisafe/core/components.dart';
+import 'package:medisafe/core/primary_color.dart';
 import 'package:medisafe/features/home/doctor/presentation/screens/doctor_details_screen.dart';
 import 'package:medisafe/models/category_model.dart';
 import 'package:medisafe/models/doctor_model.dart';
@@ -18,9 +20,12 @@ class CategoryDoctorsScreen extends StatelessWidget {
         .snapshots();
 
     return Scaffold(
+      backgroundColor: AppColors.appColor,
       appBar: AppBar(
-        title: Text('${category.name} Doctors'),
-      ),
+          backgroundColor: AppColors.primaryColor,
+          title: Pacifico(text: '${category.name} Doctors', size: 25.0)
+          //title: Text('${category.name} Doctors'),
+          ),
       body: StreamBuilder<QuerySnapshot>(
         stream: doctorsStream,
         builder: (context, snapshot) {
@@ -50,11 +55,15 @@ class CategoryDoctorsScreen extends StatelessWidget {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => DoctorDetailsScreen(doctor: doctor, patiendId: '',),
+                      builder: (context) => DoctorDetailsScreen(
+                        doctor: doctor,
+                        patiendId: '',
+                      ),
                     ),
                   );
                 },
                 child: Card(
+                  color: AppColors.primaryColor,
                   margin:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: ListTile(
