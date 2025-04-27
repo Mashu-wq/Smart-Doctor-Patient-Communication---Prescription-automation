@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:intl/intl.dart';
 import 'package:medisafe/features/home/patient/presentation/screens/appointmentsScreen.dart';
 import 'package:medisafe/models/doctor_model.dart';
 
@@ -116,15 +117,37 @@ class _AppointmentPageState extends State<AppointmentPage> {
   }
 
   DateTime? _parseTime(String time) {
-    final parts = time.split(':');
-    if (parts.length != 2) return null;
-    final hour = int.tryParse(parts[0]) ?? 0;
-    final minute = int.tryParse(parts[1]) ?? 0;
-    return DateTime(today.year, today.month, today.day, hour, minute);
+    try {
+      // Normalize: uppercase and ensure there's only a single space between time and meridiem
+      String normalized =
+          time.trim().toUpperCase().replaceAll(RegExp(r'\s+'), ' ');
+
+      // Ensure format like "12:30 AM" (in case someone writes "12:30am", "12:30aM", etc.)
+      final match = RegExp(r'(\d{1,2}:\d{2})\s*(AM|PM)').firstMatch(normalized);
+      if (match == null) {
+        debugPrint("⚠️ No match found for time string: $time");
+        return null;
+      }
+
+      String cleaned = "${match.group(1)} ${match.group(2)}"; // "12:30 AM"
+      final format = DateFormat("h:mm a");
+      final parsedTime = format.parse(cleaned);
+
+      return DateTime(
+        DateTime.now().year,
+        DateTime.now().month,
+        DateTime.now().day,
+        parsedTime.hour,
+        parsedTime.minute,
+      );
+    } catch (e) {
+      debugPrint("⚠️ Failed to parse time: $time — $e");
+      return null;
+    }
   }
 
   String _formatTime(DateTime time) {
-    return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+    return DateFormat('h:mm a').format(time); // Ex: 6:30 AM
   }
 
   Future<void> _bookAppointment() async {

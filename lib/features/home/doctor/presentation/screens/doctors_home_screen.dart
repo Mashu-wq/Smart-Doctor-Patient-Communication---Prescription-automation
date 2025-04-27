@@ -6,7 +6,6 @@ import 'package:intl/intl.dart';
 import 'package:medisafe/core/components.dart';
 import 'package:medisafe/core/primary_color.dart';
 import 'package:medisafe/features/home/patient/presentation/screens/patient_profile_consultancy.dart';
-import 'package:uuid/uuid.dart';
 
 import 'package:medisafe/providers.dart';
 
@@ -37,14 +36,14 @@ class HomeScreen extends ConsumerWidget {
             const SizedBox(height: 30),
             const DigitalClock(),
             const SizedBox(height: 30),
-            const Poppins(text: " Appointments", size: 24.0),
+            const Poppins(text: "Appointments", size: 24.0),
             const SizedBox(height: 10),
             Expanded(
               child: StreamBuilder<QuerySnapshot>(
                 stream: FirebaseFirestore.instance
                     .collection('appointments')
                     .where('doctorId', isEqualTo: doctorId)
-                    .snapshots(), // no .orderBy() to avoid index
+                    .snapshots(),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());
@@ -63,49 +62,25 @@ class HomeScreen extends ConsumerWidget {
 
                   final appointments = snapshot.data!.docs;
 
-                  // Group by date and sort client-side
-                  final Map<String, List<QueryDocumentSnapshot>> grouped = {};
+                  // Group by date
+                  final Map<String, List<QueryDocumentSnapshot>>
+                      groupedAppointments = {};
                   for (var doc in appointments) {
                     final date = doc['date'] ?? 'Unknown';
-                    if (!grouped.containsKey(date)) {
-                      grouped[date] = [];
+                    if (!groupedAppointments.containsKey(date)) {
+                      groupedAppointments[date] = [];
                     }
-                    grouped[date]!.add(doc);
+                    groupedAppointments[date]!.add(doc);
                   }
 
-                  final sortedDates = grouped.keys.toList()
-                    ..sort((a, b) => a.compareTo(b));
-
-                  final filteredDates = sortedDates.where((date) {
-                    final dateAppointments = grouped[date]!;
-                    return dateAppointments.any((appointment) {
-                      final data = appointment.data() as Map<String, dynamic>;
-                      final timeStr = data['timeSlot'] ?? 'N/A';
-                      final isConsulted = data['isConsulted'] ?? false;
-                      final dateStr = data['date'] ?? '';
-
-                      DateTime now = DateTime.now();
-                      DateTime appointmentDateTime;
-                      try {
-                        appointmentDateTime = DateFormat("yyyy-MM-dd HH:mm")
-                            .parse("$dateStr $timeStr");
-                      } catch (_) {
-                        appointmentDateTime =
-                            now.subtract(const Duration(days: 1));
-                      }
-
-                      String dynamicStatus;
-                      if (isConsulted) return false;
-                      if (appointmentDateTime.isBefore(now)) return false;
-                      return true; // Keep only if it's "Pending"
-                    });
-                  }).toList();
+                  final sortedDates = groupedAppointments.keys.toList()
+                    ..sort((a, b) => a.compareTo(b)); // Sort the dates
 
                   return ListView.builder(
-                    itemCount: filteredDates.length,
+                    itemCount: sortedDates.length,
                     itemBuilder: (context, index) {
-                      final date = filteredDates[index];
-                      final dateAppointments = grouped[date]!;
+                      final date = sortedDates[index];
+                      final dateAppointments = groupedAppointments[date]!;
 
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -137,42 +112,7 @@ class HomeScreen extends ConsumerWidget {
                             final userId = data['userId'];
                             final timeStr = data['timeSlot'] ?? 'N/A';
                             final isConsulted = data['isConsulted'] ?? false;
-                            final dateStr = data['date'] ?? '';
-                            final roomId = data['roomId'] ?? const Uuid().v4();
-
-                            if (!data.containsKey('roomId')) {
-                              FirebaseFirestore.instance
-                                  .collection('appointments')
-                                  .doc(appointment.id)
-                                  .update({'roomId': roomId});
-                            }
-
-                            DateTime now = DateTime.now();
-                            DateTime appointmentDateTime;
-
-                            try {
-                              final fullDateTimeStr = "$dateStr $timeStr";
-                              appointmentDateTime =
-                                  DateFormat("yyyy-MM-dd HH:mm")
-                                      .parse(fullDateTimeStr);
-                            } catch (_) {
-                              appointmentDateTime =
-                                  now.subtract(const Duration(days: 1));
-                            }
-
-                            // ✅ Determine dynamic status
-                            String dynamicStatus;
-                            if (isConsulted) {
-                              dynamicStatus = "Visited";
-                            } else if (appointmentDateTime.isBefore(now)) {
-                              dynamicStatus = "Rejected";
-                            } else {
-                              dynamicStatus = "Pending";
-                            }
-
-                            // ✅ Skip if rejected
-                            if (dynamicStatus != "Pending")
-                              return const SizedBox.shrink();
+                            final status = isConsulted ? "Visited" : "Pending";
 
                             return FutureBuilder<DocumentSnapshot>(
                               future: FirebaseFirestore.instance
@@ -206,13 +146,13 @@ class HomeScreen extends ConsumerWidget {
                                 return AppointmentCard(
                                   patientName: patientName,
                                   time: timeStr,
-                                  status: dynamicStatus,
+                                  status: status,
                                   contactNumber: contactNumber,
                                   patientId: userId,
                                 );
                               },
                             );
-                          }),
+                          }).toList(),
                           const SizedBox(height: 16),
                         ],
                       );
@@ -368,9 +308,8 @@ class AppointmentCard extends StatelessWidget {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) =>
-                PatientProfileForConsultancy(patientId: patientId),
-          ),
+              builder: (context) =>
+                  PatientProfileForConsultancy(patientId: patientId)),
         );
       },
       child: Container(

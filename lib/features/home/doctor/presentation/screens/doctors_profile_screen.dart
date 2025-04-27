@@ -1,6 +1,9 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:medisafe/core/components.dart';
 import 'package:medisafe/core/primary_color.dart';
+import 'package:medisafe/features/authentication/doctor/presentation/screens/doctor_login_screen.dart';
 import 'package:medisafe/models/doctor_model.dart';
 import 'package:medisafe/providers.dart';
 
@@ -14,7 +17,11 @@ class ProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     if (doctorId.isEmpty) {
       return Scaffold(
-        appBar: AppBar(title: const Text("Doctor's Profile")),
+        backgroundColor: AppColors.appColor,
+        appBar: AppBar(
+          backgroundColor: AppColors.primaryColor,
+          title: Pacifico(text: "Doctor's Profile", size: 25.0),
+        ),
         body: const Center(
           child: Text(
             "Error: Doctor ID is empty or null",
@@ -29,7 +36,36 @@ class ProfileScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: AppColors.appColor,
       appBar: AppBar(
-        title: const Text("Doctor's Profile"),
+        backgroundColor: AppColors.primaryColor,
+        title: Pacifico(text: "Doctor's Profile", size: 25.0),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () async {
+              final confirm = await showDialog<bool>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text("Confirm Logout"),
+                  content: const Text("Are you sure you want to log out?"),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(false),
+                      child: const Text("Cancel"),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(true),
+                      child: const Text("Logout"),
+                    ),
+                  ],
+                ),
+              );
+
+              if (confirm == true) {
+                await _logout(context);
+              }
+            },
+          ),
+        ],
       ),
       body: LayoutBuilder(
         builder: (context, constraints) {
@@ -61,7 +97,7 @@ class ProfileDetails extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.all(10.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -83,21 +119,16 @@ class ProfileDetails extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-
-          // Editable Fields
           _buildEditableCard(context, "Specialization", profile.specialization,
               "specialization"),
           _buildEditableCard(context, "Experience",
-              "${profile.experience} years", "experience"),
+              profile.experience.toString(), "experience"),
           _buildEditableCard(context, "Qualifications", profile.qualifications,
               "qualifications"),
           _buildEditableCard(context, "Available Schedule",
-              profile.availableTime, "available_schedule"),
+              profile.availableTime, "available_time"),
           _buildEditableCard(context, "About", profile.about, "about"),
-
           const Divider(),
-
-          // Doctor Stats
           _buildStatisticCard(
             title: "Appointments Overview",
             stats: [
@@ -125,6 +156,7 @@ class ProfileDetails extends StatelessWidget {
   Widget _buildEditableCard(
       BuildContext context, String title, String value, String fieldKey) {
     return Card(
+      color: Colors.white,
       elevation: 2,
       margin: const EdgeInsets.symmetric(vertical: 8),
       child: ListTile(
@@ -151,8 +183,17 @@ class ProfileDetails extends StatelessWidget {
   void _updateField(BuildContext context, String field, String value) async {
     try {
       final provider = ref.read(updateDoctorProfileProvider);
-      await provider.updateDoctorProfile(profile.id, {field: value});
 
+      // Convert to int if updating experience
+      final updateData = field == 'experience'
+          ? {
+              field: int.tryParse(
+                      RegExp(r'\d+').firstMatch(value)?.group(0) ?? '0') ??
+                  0
+            }
+          : {field: value};
+
+      await provider.updateDoctorProfile(profile.id, updateData);
       ref.refresh(doctorProfileProvider(profile.id));
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -168,6 +209,7 @@ class ProfileDetails extends StatelessWidget {
   Widget _buildStatisticCard(
       {required String title, required List<Widget> stats}) {
     return Card(
+      color: Colors.white,
       elevation: 2,
       margin: const EdgeInsets.symmetric(vertical: 8),
       child: Padding(
@@ -204,6 +246,8 @@ class EditFieldDialog extends StatelessWidget {
       content: TextField(
         controller: controller,
         decoration: InputDecoration(hintText: "Enter $title"),
+        keyboardType:
+            title == "Experience" ? TextInputType.number : TextInputType.text,
         maxLines: title == "About" ? 4 : 1,
       ),
       actions: [
@@ -214,6 +258,22 @@ class EditFieldDialog extends StatelessWidget {
             onPressed: () => Navigator.of(context).pop(controller.text),
             child: const Text("Save")),
       ],
+    );
+  }
+}
+
+Future<void> _logout(BuildContext context) async {
+  try {
+    await FirebaseAuth.instance.signOut();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Logged out successfully")),
+    );
+    // Navigate to login screen (if needed, replace with your actual login screen navigation)
+    Navigator.push(
+        context, MaterialPageRoute(builder: (context) => DoctorLoginScreen()));
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("Failed to log out: $e")),
     );
   }
 }

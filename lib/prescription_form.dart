@@ -6,12 +6,14 @@ class AddPrescriptionForm extends StatefulWidget {
   final String patientId;
   final String patientName;
   final int patientAge;
+  final String appointmentId; // <-- passed from visit
 
   const AddPrescriptionForm({
     super.key,
     required this.patientId,
     required this.patientName,
     required this.patientAge,
+    required this.appointmentId,
   });
 
   @override
@@ -56,9 +58,30 @@ class _AddPrescriptionFormState extends State<AddPrescriptionForm> {
         .doc(prescription.id)
         .set(prescription.toMap());
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Prescription saved successfully!")),
-    );
+    // ✅ Mark appointment as visited
+    await FirebaseFirestore.instance
+        .collection('appointments')
+        .doc(widget.appointmentId)
+        .update({'status': 'Visited'});
+
+    // ✅ Create notification
+    await FirebaseFirestore.instance.collection('notifications').add({
+      'type': 'visited_appointment',
+      'userId': widget.patientId,
+      'doctorName':
+          prescription.patientName, // or use your actual doctor name source
+      'timestamp': FieldValue.serverTimestamp(),
+      'message': 'You have visited Dr. ${prescription.patientName}',
+    });
+
+    // ✅ Confirm and go back
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text("Prescription saved and visit completed!")),
+      );
+      Navigator.pop(context);
+    }
   }
 
   @override

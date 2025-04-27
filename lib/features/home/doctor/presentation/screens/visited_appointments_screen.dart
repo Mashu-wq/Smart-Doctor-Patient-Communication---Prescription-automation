@@ -6,9 +6,6 @@ class VisitedAppointmentsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Get today's date in 'yyyy-MM-dd' format
-    final String today = DateTime.now().toIso8601String().substring(0, 10);
-
     return Scaffold(
       appBar: AppBar(
         title: const Text("Visited Appointments"),
@@ -42,23 +39,11 @@ class VisitedAppointmentsScreen extends StatelessWidget {
               );
             }
 
-            // Filter appointments excluding today's date
-            final visitedAppointments = snapshot.data!.docs.where((doc) {
-              final appointmentDate = doc['date'] ?? '';
-              return appointmentDate != today;
-            }).toList();
-
-            if (visitedAppointments.isEmpty) {
-              return const Center(
-                child: Text("No visited appointments found."),
-              );
-            }
-
             return ListView.builder(
-              itemCount: visitedAppointments.length,
+              itemCount: snapshot.data!.docs.length,
               itemBuilder: (context, index) {
                 final appointment =
-                    visitedAppointments[index].data() as Map<String, dynamic>;
+                    snapshot.data!.docs[index].data() as Map<String, dynamic>;
                 final date = appointment['date'] ?? 'N/A';
                 final timeSlot = appointment['timeSlot'] ?? 'N/A';
                 final status = appointment['status'] ?? 'Visited';

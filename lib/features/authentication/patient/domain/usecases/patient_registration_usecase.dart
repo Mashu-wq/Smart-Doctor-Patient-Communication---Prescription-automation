@@ -52,6 +52,7 @@ class PatientRegistrationUseCase {
         'date_of_birth': dateOfBirth.toIso8601String(),
         'age': age,
         'profile_image_url': profileImageUrl ?? '',
+        'prescription': null,
       });
     } catch (e) {
       throw Exception("Failed to register patient: $e");

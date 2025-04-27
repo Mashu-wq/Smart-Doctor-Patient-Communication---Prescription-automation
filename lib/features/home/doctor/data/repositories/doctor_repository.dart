@@ -28,9 +28,9 @@ class DoctorRepository {
       query = query.where('category', isEqualTo: filter.category);
     }
 
-    if (filter.date != null) {
-      query = query.where('available_dates', arrayContains: filter.date);
-    }
+    // if (filter.date != null) {
+    //   query = query.where('available_dates', arrayContains: filter.date);
+    // }
 
     QuerySnapshot snapshot = await query.get();
     return snapshot.docs.map((doc) => Doctor.fromFirestore(doc)).toList();
