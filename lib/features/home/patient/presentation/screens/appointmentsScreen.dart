@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:medisafe/core/components.dart';
 import 'package:medisafe/core/primary_color.dart';
 import 'package:medisafe/features/home/doctor/presentation/screens/doctor_details_screen.dart';
@@ -48,23 +49,40 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
             return const Center(child: Text('No appointments found.'));
           }
 
-          // Sort the appointments by date
+          // Combine doc and its data for sorting/deleting
           final appointments = snapshot.data!.docs.map((doc) {
             final data = doc.data() as Map<String, dynamic>;
-            return data;
+            return {
+              'docId': doc.id,
+              ...data,
+            };
           }).toList();
 
-          // Sort by date
+          // Sort by date AND time (correct robust sorting)
           appointments.sort((a, b) {
-            final dateA = DateTime.parse(a['date']);
-            final dateB = DateTime.parse(b['date']);
-            return dateA.compareTo(dateB); // Ascending order
+            try {
+              final dateA = DateTime.parse(a['date']);
+              final dateB = DateTime.parse(b['date']);
+              if (dateA.compareTo(dateB) != 0) {
+                return dateA.compareTo(dateB);
+              }
+              // If same date, sort by time (if present)
+              final timeA = a['timeSlot'] as String? ?? '12:00 AM';
+              final timeB = b['timeSlot'] as String? ?? '12:00 AM';
+              final timeFmt = DateFormat('h:mm a');
+              final tA = timeFmt.parse(timeA);
+              final tB = timeFmt.parse(timeB);
+              return tA.compareTo(tB);
+            } catch (_) {
+              return 0;
+            }
           });
 
           return ListView.builder(
             itemCount: appointments.length,
             itemBuilder: (context, index) {
               final appointment = appointments[index];
+              final docId = appointment['docId'];
               return Card(
                 color: AppColors.primaryColor,
                 margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -105,8 +123,6 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
 
                       if (confirm == true) {
                         try {
-                          // Find the document ID for this appointment
-                          final docId = snapshot.data!.docs[index].id;
                           await FirebaseFirestore.instance
                               .collection('appointments')
                               .doc(docId)

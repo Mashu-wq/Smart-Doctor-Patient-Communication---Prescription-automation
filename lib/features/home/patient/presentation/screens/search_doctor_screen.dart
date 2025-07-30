@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:medisafe/features/home/patient/presentation/controllers/search_doctor_controller.dart';
-import 'package:medisafe/features/home/patient/presentation/screens/filtered_doctors_screen.dart';
 import 'package:medisafe/models/search_filter_model.dart';
 
 class SearchDoctorScreen extends ConsumerStatefulWidget {
@@ -14,33 +13,27 @@ class SearchDoctorScreen extends ConsumerStatefulWidget {
 class _SearchDoctorScreenState extends ConsumerState<SearchDoctorScreen> {
   final TextEditingController _areaController = TextEditingController();
   String? _selectedCategory;
-  //DateTime? _selectedDate;
-
-  // void _pickDate() async {
-  //   DateTime? pickedDate = await showDatePicker(
-  //     context: context,
-  //     initialDate: DateTime.now(),
-  //     firstDate: DateTime.now(),
-  //     lastDate: DateTime.now().add(const Duration(days: 365)),
-  //   );
-
-  //   setState(() {
-  //     _selectedDate = pickedDate;
-  //   });
-  // }
 
   void _performSearch() {
+    final area = _areaController.text.trim();
+    final category = _selectedCategory;
+
+    // Debug print: Inputs before search
+    print('Performing search with area="$area" and category="$category"');
+
     final filter = SearchFilter(
-      area: _areaController.text,
-      category: _selectedCategory,
-      //date: _selectedDate,
+      area: area.isNotEmpty ? area : null,
+      category: category,
     );
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => FilteredDoctorsScreen(filter: filter),
-      ),
-    );
+
+    if ((filter.area == null || filter.area!.isEmpty) &&
+        (filter.category == null || filter.category!.isEmpty)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Please enter area or select a specialist')),
+      );
+      return;
+    }
 
     ref.read(searchDoctorControllerProvider.notifier).searchDoctors(filter);
   }
@@ -62,9 +55,8 @@ class _SearchDoctorScreenState extends ConsumerState<SearchDoctorScreen> {
       ),
       backgroundColor: Colors.grey[100],
       body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 24.0),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
               padding: const EdgeInsets.all(16),
@@ -73,90 +65,57 @@ class _SearchDoctorScreenState extends ConsumerState<SearchDoctorScreen> {
                 borderRadius: BorderRadius.circular(10),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.grey.withOpacity(0.3),
-                    spreadRadius: 2,
-                    blurRadius: 8,
-                  ),
+                      color: Colors.grey.withOpacity(0.3),
+                      spreadRadius: 2,
+                      blurRadius: 8)
                 ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    "Select Area",
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
+                  const Text("Select Area",
+                      style: TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
                   TextField(
                     controller: _areaController,
                     decoration: InputDecoration(
-                      hintText: "Select Area",
+                      hintText: "Enter Area",
                       prefixIcon: const Icon(Icons.location_on_outlined),
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
+                          borderRadius: BorderRadius.circular(8)),
                       filled: true,
                       fillColor: Colors.grey[100],
                     ),
                   ),
                   const SizedBox(height: 16),
-                  const Text(
-                    "Doctor, Specialist",
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
+                  const Text("Doctor, Specialist",
+                      style: TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
                     value: _selectedCategory,
                     items: <String>[
-                      'Cardiology',
-                      'Neurology',
+                      'Cardiologist',
+                      'Neurologist',
                       'Pediatrics',
                       'General'
-                    ].map((String value) {
-                      return DropdownMenuItem<String>(
-                        value: value,
-                        child: Text(value),
-                      );
-                    }).toList(),
+                    ]
+                        .map((cat) =>
+                            DropdownMenuItem(value: cat, child: Text(cat)))
+                        .toList(),
                     onChanged: (newValue) {
                       setState(() {
                         _selectedCategory = newValue;
                       });
                     },
                     decoration: InputDecoration(
-                      hintText: "Doctor, Specialist",
+                      hintText: "Select Specialist",
                       prefixIcon: const Icon(Icons.medical_services_outlined),
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
+                          borderRadius: BorderRadius.circular(8)),
                       filled: true,
                       fillColor: Colors.grey[100],
                     ),
                   ),
-                  // const SizedBox(height: 16),
-                  // const Text(
-                  //   "Select Date",
-                  //   style: TextStyle(fontWeight: FontWeight.bold),
-                  // ),
-                  // const SizedBox(height: 8),
-                  // GestureDetector(
-                  //   onTap: _pickDate,
-                  //   child: AbsorbPointer(
-                  //     child: TextFormField(
-                  //       decoration: InputDecoration(
-                  //         hintText: _selectedDate == null
-                  //             ? "Select Date"
-                  //             : DateFormat('yyyy-MM-dd').format(_selectedDate!),
-                  //         prefixIcon: const Icon(Icons.calendar_today_outlined),
-                  //         border: OutlineInputBorder(
-                  //           borderRadius: BorderRadius.circular(8),
-                  //         ),
-                  //         filled: true,
-                  //         fillColor: Colors.grey[100],
-                  //       ),
-                  //     ),
-                  //   ),
-                  // ),
                 ],
               ),
             ),
@@ -169,30 +128,41 @@ class _SearchDoctorScreenState extends ConsumerState<SearchDoctorScreen> {
                   backgroundColor: Colors.purpleAccent,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
+                      borderRadius: BorderRadius.circular(8)),
                 ),
-                child: const Text(
-                  'Search',
-                  style: TextStyle(fontSize: 16),
-                ),
+                child: const Text('Search', style: TextStyle(fontSize: 16)),
               ),
             ),
             const SizedBox(height: 16),
             Expanded(
               child: searchState.when(
-                data: (doctors) => ListView.builder(
-                  itemCount: doctors.length,
-                  itemBuilder: (context, index) {
-                    final doctor = doctors[index];
-                    return ListTile(
-                      title: Text(doctor.name),
-                      subtitle: Text(doctor.specialization),
-                    );
-                  },
-                ),
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, _) => Text('Error: $e'),
+                data: (doctors) {
+                  // Debug print: Number of doctors returned
+                  print('Search returned ${doctors.length} doctors');
+
+                  if (doctors.isEmpty) {
+                    return const Center(child: Text('No doctors found.'));
+                  }
+                  return ListView.builder(
+                    itemCount: doctors.length,
+                    itemBuilder: (context, index) {
+                      final doctor = doctors[index];
+                      return ListTile(
+                        title: Text(doctor.name),
+                        subtitle: Text(doctor.specialization),
+                        // You can add onTap navigation here if needed
+                      );
+                    },
+                  );
+                },
+                loading: () {
+                  print('Search loading...');
+                  return const Center(child: CircularProgressIndicator());
+                },
+                error: (error, _) {
+                  print('Search error: $error');
+                  return Center(child: Text('Error: $error'));
+                },
               ),
             ),
           ],

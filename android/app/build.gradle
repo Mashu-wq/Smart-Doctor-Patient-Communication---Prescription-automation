@@ -10,9 +10,14 @@ android {
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
+
+    
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
+
+        //isCoreLibraryDesugaringEnabled = true
 
         // Enable core library desugaring
         //isCoreLibraryDesugaringEnabled = true  // Add this line here
@@ -39,9 +44,9 @@ android {
     }
 }
 
-// Add this block under the android block to add the desugar JDK library
+//Add this block under the android block to add the desugar JDK library
 // dependencies {
-//     implementation 'com.android.tools:desugar_jdk_libs:1.1.5'  // This line is inside the dependencies block
+//    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.3")
 // }
 
 flutter {

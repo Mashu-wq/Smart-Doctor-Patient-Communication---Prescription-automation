@@ -7,6 +7,7 @@ import 'package:medisafe/features/home/doctor/domain/usecases/fetch_categories_u
 import 'package:medisafe/features/home/doctor/domain/usecases/fetch_doctor_usecases.dart';
 import 'package:medisafe/features/home/patient/data/patient_repository.dart';
 import 'package:medisafe/features/home/patient/domain/usecases/search_doctors_usecase.dart';
+
 import 'package:medisafe/models/doctor_model.dart';
 import 'package:medisafe/models/patient_model.dart';
 
@@ -23,8 +24,12 @@ final fetchCategoriesUseCaseProvider = Provider<FetchCategoriesUseCase>((ref) {
   return FetchCategoriesUseCase(ref.read(categoryRepositoryProvider));
 });
 
+// final searchDoctorsUseCaseProvider = Provider<SearchDoctorsUseCase>((ref) {
+//   return SearchDoctorsUseCase(ref.read(doctorRepositoryProvider));
+// });
 final searchDoctorsUseCaseProvider = Provider<SearchDoctorsUseCase>((ref) {
-  return SearchDoctorsUseCase(ref.read(doctorRepositoryProvider));
+  final repository = ref.read(doctorRepositoryProvider);
+  return SearchDoctorsUseCase(repository);
 });
 
 final doctorNameProvider = FutureProvider<String>((ref) async {

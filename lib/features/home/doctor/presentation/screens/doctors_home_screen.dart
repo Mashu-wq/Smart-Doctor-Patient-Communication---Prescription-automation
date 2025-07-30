@@ -6,16 +6,51 @@ import 'package:intl/intl.dart';
 import 'package:medisafe/core/components.dart';
 import 'package:medisafe/core/primary_color.dart';
 import 'package:medisafe/features/home/patient/presentation/screens/patient_profile_consultancy.dart';
-
 import 'package:medisafe/providers.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
+  Future<void> _rejectExpiredAppointments(String doctorId) async {
+    final now = DateTime.now();
+    final appointmentQuery = await FirebaseFirestore.instance
+        .collection('appointments')
+        .where('doctorId', isEqualTo: doctorId)
+        .where('isConsulted', isEqualTo: false)
+        .where('status', isEqualTo: 'Pending')
+        .get();
+
+    for (final doc in appointmentQuery.docs) {
+      final data = doc.data();
+      final String dateStr = data['date'] ?? '';
+      final String timeStr = data['timeSlot'] ?? '';
+      if (dateStr.isEmpty || timeStr.isEmpty) continue;
+
+      try {
+        final date = DateFormat('yyyy-MM-dd').parse(dateStr);
+        final time = DateFormat('h:mm a').parse(timeStr);
+        final appointmentStart = DateTime(
+          date.year,
+          date.month,
+          date.day,
+          time.hour,
+          time.minute,
+        );
+        // If 30min have passed since appointment start and it's still pending, mark as "Rejected"
+        if (now.isAfter(appointmentStart.add(const Duration(minutes: 30)))) {
+          await doc.reference.update({'status': 'Rejected'});
+        }
+      } catch (_) {}
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final doctorName = ref.watch(doctorNameProvider);
     final String doctorId = FirebaseAuth.instance.currentUser?.uid ?? '';
+
+    // Trigger cleanup of expired appointments (safe for small user collections)
+    _rejectExpiredAppointments(doctorId);
 
     return Scaffold(
       backgroundColor: AppColors.appColor,
@@ -60,22 +95,90 @@ class HomeScreen extends ConsumerWidget {
                     return const Center(child: Text('No appointments found.'));
                   }
 
-                  final appointments = snapshot.data!.docs;
+                  // Filter: pending and not expired
+                  final appointments = snapshot.data!.docs.where((doc) {
+                    final data = doc.data() as Map<String, dynamic>;
+                    if (data['status'] != 'Pending') return false;
 
-                  // Group by date
+                    final String dateStr = data['date'] ?? '';
+                    final String timeStr = data['timeSlot'] ?? '';
+                    if (dateStr.isEmpty || timeStr.isEmpty) return false;
+
+                    try {
+                      final date = DateFormat('yyyy-MM-dd').parse(dateStr);
+                      final time = DateFormat('h:mm a').parse(timeStr);
+                      final appointmentStart = DateTime(
+                        date.year,
+                        date.month,
+                        date.day,
+                        time.hour,
+                        time.minute,
+                      );
+                      // Only show if within 30 minutes window
+                      return DateTime.now().isBefore(
+                          appointmentStart.add(const Duration(minutes: 30)));
+                    } catch (_) {
+                      return false;
+                    }
+                  }).toList();
+
+                  // ---- SORTING by (date, time) ascending ----
+                  List<QueryDocumentSnapshot> sortedAppointments =
+                      List.from(appointments);
+                  sortedAppointments.sort((a, b) {
+                    final aData = a.data() as Map<String, dynamic>;
+                    final bData = b.data() as Map<String, dynamic>;
+                    final aDateStr = aData['date'] ?? '';
+                    final bDateStr = bData['date'] ?? '';
+                    final aTimeStr = aData['timeSlot'] ?? '00:00 AM';
+                    final bTimeStr = bData['timeSlot'] ?? '00:00 AM';
+
+                    DateTime aDateTime, bDateTime;
+                    try {
+                      final aDate = DateFormat('yyyy-MM-dd').parse(aDateStr);
+                      final aTime = DateFormat('h:mm a').parse(aTimeStr);
+                      aDateTime = DateTime(aDate.year, aDate.month, aDate.day,
+                          aTime.hour, aTime.minute);
+                    } catch (_) {
+                      aDateTime = DateTime(1970);
+                    }
+                    try {
+                      final bDate = DateFormat('yyyy-MM-dd').parse(bDateStr);
+                      final bTime = DateFormat('h:mm a').parse(bTimeStr);
+                      bDateTime = DateTime(bDate.year, bDate.month, bDate.day,
+                          bTime.hour, bTime.minute);
+                    } catch (_) {
+                      bDateTime = DateTime(1970);
+                    }
+
+                    return aDateTime.compareTo(bDateTime);
+                  });
+
+                  // ---- GROUP by date AFTER sorting ----
                   final Map<String, List<QueryDocumentSnapshot>>
                       groupedAppointments = {};
-                  for (var doc in appointments) {
-                    final date = doc['date'] ?? 'Unknown';
-                    if (!groupedAppointments.containsKey(date)) {
-                      groupedAppointments[date] = [];
-                    }
+                  for (var doc in sortedAppointments) {
+                    final date = (doc.data() as Map<String, dynamic>)['date'] ??
+                        'Unknown';
+                    groupedAppointments.putIfAbsent(date, () => []);
                     groupedAppointments[date]!.add(doc);
                   }
-
                   final sortedDates = groupedAppointments.keys.toList()
-                    ..sort((a, b) => a.compareTo(b)); // Sort the dates
+                    ..sort((a, b) {
+                      try {
+                        final aDate = DateFormat('yyyy-MM-dd').parse(a);
+                        final bDate = DateFormat('yyyy-MM-dd').parse(b);
+                        return aDate.compareTo(bDate);
+                      } catch (_) {
+                        return a.compareTo(b);
+                      }
+                    }); // Sorted by date string
 
+                  if (appointments.isEmpty) {
+                    return const Center(child: Text('No appointments found.'));
+                  }
+
+                  // UI Display
                   return ListView.builder(
                     itemCount: sortedDates.length,
                     itemBuilder: (context, index) {
@@ -127,7 +230,6 @@ class HomeScreen extends ConsumerWidget {
                                     subtitle: Text("Fetching patient data"),
                                   );
                                 }
-
                                 if (!patientSnapshot.hasData ||
                                     !patientSnapshot.data!.exists) {
                                   return const ListTile(
@@ -135,7 +237,6 @@ class HomeScreen extends ConsumerWidget {
                                     subtitle: Text("Patient data not found"),
                                   );
                                 }
-
                                 final patientData = patientSnapshot.data!.data()
                                     as Map<String, dynamic>;
                                 final patientName =
@@ -152,7 +253,7 @@ class HomeScreen extends ConsumerWidget {
                                 );
                               },
                             );
-                          }).toList(),
+                          }),
                           const SizedBox(height: 16),
                         ],
                       );
@@ -167,6 +268,8 @@ class HomeScreen extends ConsumerWidget {
     );
   }
 }
+
+// --- Supporting UI Widgets ---
 
 class AnimatedDoctorName extends StatefulWidget {
   final String name;
@@ -183,7 +286,6 @@ class _AnimatedDoctorNameState extends State<AnimatedDoctorName>
   @override
   void initState() {
     super.initState();
-    // Trigger animation after frame build
     WidgetsBinding.instance.addPostFrameCallback((_) {
       setState(() {
         _visible = true;
@@ -204,14 +306,6 @@ class _AnimatedDoctorNameState extends State<AnimatedDoctorName>
           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
           margin: const EdgeInsets.only(bottom: 16),
           decoration: BoxDecoration(
-            // boxShadow: [
-            //   BoxShadow(
-            //     color: Colors.black.withOpacity(0.2),
-            //     spreadRadius: 3,
-            //     blurRadius: 1,
-            //     offset: const Offset(0, 1),
-            //   ),
-            // ],
             color: AppColors.appColor,
             borderRadius: BorderRadius.circular(12),
           ),
@@ -313,7 +407,7 @@ class AppointmentCard extends StatelessWidget {
         );
       },
       child: Container(
-        width: double.infinity, // ✅ Full screen width
+        width: double.infinity,
         margin: const EdgeInsets.symmetric(vertical: 6),
         child: Card(
           shape: RoundedRectangleBorder(

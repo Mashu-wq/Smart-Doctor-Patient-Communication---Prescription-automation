@@ -53,36 +53,73 @@ class _AddPrescriptionFormState extends State<AddPrescriptionForm> {
       nextConsultancyDate: DateTime.parse(_nextConsultancyDateController.text),
     );
 
-    await FirebaseFirestore.instance
-        .collection('prescriptions')
-        .doc(prescription.id)
-        .set(prescription.toMap());
+    try {
+      // Save prescription to Firestore
+      await FirebaseFirestore.instance
+          .collection('patients')
+          .doc(widget.patientId)
+          .collection('prescriptions')
+          .doc(prescription.id)
+          .set(prescription.toMap());
 
-    // ✅ Mark appointment as visited
-    await FirebaseFirestore.instance
-        .collection('appointments')
-        .doc(widget.appointmentId)
-        .update({'status': 'Visited'});
+      // Mark appointment as visited
+      await FirebaseFirestore.instance
+          .collection('appointments')
+          .doc(widget.appointmentId)
+          .update({'status': 'Visited'});
 
-    // ✅ Create notification
-    await FirebaseFirestore.instance.collection('notifications').add({
-      'type': 'visited_appointment',
-      'userId': widget.patientId,
-      'doctorName':
-          prescription.patientName, // or use your actual doctor name source
-      'timestamp': FieldValue.serverTimestamp(),
-      'message': 'You have visited Dr. ${prescription.patientName}',
-    });
+      // Create notification for the patient
+      await FirebaseFirestore.instance.collection('notifications').add({
+        'type': 'visited_appointment',
+        'userId': widget.patientId,
+        'doctorName': prescription.patientName,
+        'timestamp': FieldValue.serverTimestamp(),
+        'message': 'You have visited by Dr. ${prescription.patientName}',
+      });
 
-    // ✅ Confirm and go back
-    if (context.mounted) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Prescription saved and visit completed!')),
+        );
+        Navigator.pop(context);
+      }
+    } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text("Prescription saved and visit completed!")),
+        SnackBar(content: Text('Error: $e')),
       );
-      Navigator.pop(context);
     }
   }
+  //   await FirebaseFirestore.instance
+  //       .collection('prescriptions')
+  //       .doc(prescription.id)
+  //       .set(prescription.toMap());
+
+  //   // ✅ Mark appointment as visited
+  //   await FirebaseFirestore.instance
+  //       .collection('appointments')
+  //       .doc(widget.appointmentId)
+  //       .update({'status': 'Visited'});
+
+  //   // ✅ Create notification
+  //   await FirebaseFirestore.instance.collection('notifications').add({
+  //     'type': 'visited_appointment',
+  //     'userId': widget.patientId,
+  //     'doctorName':
+  //         prescription.patientName, // or use your actual doctor name source
+  //     'timestamp': FieldValue.serverTimestamp(),
+  //     'message': 'You have visited Dr. ${prescription.patientName}',
+  //   });
+
+  //   // ✅ Confirm and go back
+  //   if (context.mounted) {
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       const SnackBar(
+  //           content: Text("Prescription saved and visit completed!")),
+  //     );
+  //     Navigator.pop(context);
+  //   }
+  // }
 
   @override
   Widget build(BuildContext context) {

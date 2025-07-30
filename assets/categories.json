@@ -16,7 +16,7 @@
   },
   {
     "id": "4",
-    "name": "General",
-    "icon_path": "assets/images/medicine.png"
+    "name": "Orthopedic",
+    "icon_path": "assets/images/ortho.png"
   }
 ]

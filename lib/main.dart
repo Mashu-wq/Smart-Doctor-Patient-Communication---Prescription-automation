@@ -1,3 +1,4 @@
+import 'package:awesome_notifications/awesome_notifications.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:medisafe/constants.dart';
@@ -11,6 +12,20 @@ void main() async {
   await Firebase.initializeApp(
     // Initialize Firebase
     options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+  await AwesomeNotifications().initialize(
+    'resource://drawable/res_app_icon',
+    [
+      NotificationChannel(
+        channelKey: 'medication_reminder',
+        channelName: 'Medication Reminders',
+        channelDescription: 'Reminders for taking medicines',
+        defaultColor: Colors.teal,
+        ledColor: Colors.white,
+      )
+    ],
+    debug: true,
   );
   runApp(const ProviderScope(child: MyApp()));
 }

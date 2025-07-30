@@ -19,7 +19,7 @@ class RejectedAppointmentsScreen extends StatelessWidget {
         child: StreamBuilder<QuerySnapshot>(
           stream: FirebaseFirestore.instance
               .collection('appointments')
-              .where('status', isEqualTo: 'Pending')
+              .where('status', isEqualTo: 'Rejected')
               .snapshots(),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
@@ -28,37 +28,20 @@ class RejectedAppointmentsScreen extends StatelessWidget {
 
             if (snapshot.hasError) {
               return Center(
-                child: Text('Error: ${snapshot.error}',
-                    style: const TextStyle(color: Colors.red)),
+                child: Text(
+                  'Error: ${snapshot.error}',
+                  style: const TextStyle(color: Colors.red),
+                ),
               );
             }
 
             if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
               return const Center(
-                  child: Text("No rejected appointments found."));
-            }
-
-            // Extract and filter rejected appointments only
-            final rejectedAppointments = snapshot.data!.docs.where((doc) {
-              final appointment = doc.data() as Map<String, dynamic>;
-              final dateStr = appointment['date'] ?? '';
-              final isConsulted = appointment['isConsulted'] ?? false;
-
-              DateTime appointmentDate =
-                  DateTime.tryParse(dateStr) ?? DateTime(2000);
-              DateTime today = DateTime.now();
-
-              // Appointment is in the past and not consulted
-              return !isConsulted &&
-                  appointmentDate.isBefore(today) &&
-                  appointment['status'] == 'Pending';
-            }).toList();
-
-            if (rejectedAppointments.isEmpty) {
-              return const Center(
                 child: Text("No rejected appointments found."),
               );
             }
+
+            final rejectedAppointments = snapshot.data!.docs;
 
             return ListView.builder(
               itemCount: rejectedAppointments.length,
@@ -139,8 +122,10 @@ class AppointmentCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text("Name: $patientName",
-                style: const TextStyle(fontWeight: FontWeight.bold)),
+            Text(
+              "Name: $patientName",
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 4),
             Text("Date: $date"),
             const SizedBox(height: 4),

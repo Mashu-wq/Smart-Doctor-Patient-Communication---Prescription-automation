@@ -91,17 +91,8 @@ class PatientHomeScreen extends ConsumerWidget {
       title: Pacifico(text: "Find Your Specialist", size: 20.0),
       centerTitle: true,
       actions: [
-        IconButton(
-          icon: const Icon(Icons.search, color: Colors.black),
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const SearchDoctorScreen(),
-              ),
-            );
-          },
-        ),
+        // Removed the search icon button here to disable search feature
+
         notificationCountAsync.when(
           data: (count) {
             return Stack(
