@@ -29,14 +29,21 @@ class _PatientProfileScreenState extends ConsumerState<PatientProfileScreen> {
 
   Future<void> _updatePatientProfile(Patient patient) async {
     try {
+      // Split name for Firestore fields, assuming "First Last"
+      final nameParts = _nameController.text.trim().split(' ');
+      final firstName = nameParts.isNotEmpty ? nameParts.first : '';
+      final lastName =
+          nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
+
       await FirebaseFirestore.instance
           .collection('patients')
           .doc(patient.id)
           .update({
-        'name': _nameController.text,
-        'email': _emailController.text,
-        'contactNumber': _phoneController.text,
-        'address': _addressController.text,
+        'first_name': firstName,
+        'last_name': lastName,
+        'email': _emailController.text.trim(),
+        'contact_number': _phoneController.text.trim(),
+        'address': _addressController.text.trim(),
       });
       setState(() {
         isEditing = false;
@@ -44,6 +51,8 @@ class _PatientProfileScreenState extends ConsumerState<PatientProfileScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Profile updated successfully")),
       );
+      // Optionally refresh provider for live update
+      ref.invalidate(patientProfileProvider(widget.patientId));
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Failed to update profile: $e")),
@@ -57,9 +66,11 @@ class _PatientProfileScreenState extends ConsumerState<PatientProfileScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Logged out successfully")),
       );
-      // Navigate to login screen (if needed, replace with your actual login screen navigation)
-      Navigator.push(context,
-          MaterialPageRoute(builder: (context) => PatientLoginScreen()));
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => PatientLoginScreen()),
+        (route) => false,
+      );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Failed to log out: $e")),
@@ -80,20 +91,31 @@ class _PatientProfileScreenState extends ConsumerState<PatientProfileScreen> {
           IconButton(
             icon: Icon(isEditing ? Icons.check : Icons.settings),
             onPressed: () {
-              setState(() {
-                isEditing = !isEditing;
-              });
+              if (isEditing) {
+                final patient = ref
+                    .read(patientProfileProvider(widget.patientId))
+                    .maybeWhen(
+                      data: (p) => p,
+                      orElse: () => null,
+                    );
+                if (patient != null) {
+                  _updatePatientProfile(patient);
+                }
+              } else {
+                setState(() => isEditing = true);
+              }
             },
           ),
           IconButton(
             icon: const Icon(Icons.logout),
-            onPressed: _logout, // Call logout function when button is pressed
+            onPressed: _logout,
           ),
         ],
       ),
       body: patientState.when(
         data: (patient) {
-          _nameController.text = "${patient.firstName} ${patient.lastName}";
+          _nameController.text =
+              "${patient.firstName} ${patient.lastName}".trim();
           _emailController.text = patient.email;
           _phoneController.text = patient.contactNumber;
           _addressController.text = patient.address;
@@ -116,9 +138,14 @@ class _PatientProfileScreenState extends ConsumerState<PatientProfileScreen> {
           Center(
             child: CircleAvatar(
               radius: 60,
-              backgroundImage: NetworkImage(patient.profileImageUrl),
-              onBackgroundImageError: (_, __) =>
-                  const Icon(Icons.person, size: 60),
+              backgroundImage: patient.profileImageUrl != null &&
+                      patient.profileImageUrl.isNotEmpty
+                  ? NetworkImage(patient.profileImageUrl)
+                  : null,
+              child: (patient.profileImageUrl == null ||
+                      patient.profileImageUrl.isEmpty)
+                  ? const Icon(Icons.person, size: 60)
+                  : null,
             ),
           ),
           const SizedBox(height: 16),
@@ -129,14 +156,15 @@ class _PatientProfileScreenState extends ConsumerState<PatientProfileScreen> {
           const SizedBox(height: 16),
           if (isEditing)
             ElevatedButton(
-                onPressed: () => _updatePatientProfile(patient),
-                style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.buttonColor),
-                child: Pacifico(
-                  text: "Update Profile",
-                  size: 14.0,
-                  color: AppColors.appColor,
-                )),
+              onPressed: () => _updatePatientProfile(patient),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.buttonColor),
+              child: Pacifico(
+                text: "Update Profile",
+                size: 14.0,
+                color: AppColors.appColor,
+              ),
+            ),
         ],
       ),
     );

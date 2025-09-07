@@ -1,7 +1,95 @@
+import 'package:awesome_notifications/awesome_notifications.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:medisafe/core/components.dart';
 import 'package:medisafe/core/primary_color.dart';
+
+// Future<void> scheduleMedicineReminder({
+//   required int id,
+//   required String medicineName,
+//   required String advice,
+//   required DateTime date,
+//   required String timeString,
+// }) async {
+//   // Map common named times to approximate time of day
+//   Map<String, TimeOfDay> namedTimes = {
+//     "Morning": TimeOfDay(hour: 8, minute: 0),
+//     "Afternoon": TimeOfDay(hour: 14, minute: 0),
+//     "Evening": TimeOfDay(hour: 19, minute: 0),
+//     "Night": TimeOfDay(hour: 21, minute: 0),
+//   };
+//
+//   TimeOfDay? tod;
+//   if (namedTimes.containsKey(timeString)) {
+//     tod = namedTimes[timeString];
+//   } else {
+//     // Try parse explicit time e.g. "6:30 AM"
+//     try {
+//       final dt = DateFormat.jm().parse(timeString);
+//       tod = TimeOfDay(hour: dt.hour, minute: dt.minute);
+//     } catch (_) {
+//       tod = TimeOfDay(hour: 8, minute: 0); // fallback default time
+//     }
+//   }
+//
+//   final scheduledDateTime =
+//       DateTime(date.year, date.month, date.day, tod!.hour, tod.minute);
+//
+//   // Do not schedule notifications in the past
+//   if (scheduledDateTime.isBefore(DateTime.now())) return;
+//
+//   await AwesomeNotifications().createNotification(
+//     content: NotificationContent(
+//       id: id,
+//       channelKey: 'medicine_reminder',
+//       title: 'Medicine Reminder: $medicineName',
+//       body: 'Advice: $advice\nTake now.',
+//       notificationLayout: NotificationLayout.Default,
+//     ),
+//     schedule: NotificationCalendar.fromDate(
+//         date: scheduledDateTime, preciseAlarm: true),
+//   );
+// }
+
+Future<void> scheduleMedicineRemindersForPeriod({
+  required int idStart,
+  required String medicineName,
+  required String advice,
+  required DateTime startDate,
+  required List<String> times,
+  required int durationDays,
+}) async {
+  Map<String, TimeOfDay> namedTimes = {
+    "Morning": TimeOfDay(hour: 8, minute: 0),
+    "Afternoon": TimeOfDay(hour: 14, minute: 0),
+    "Evening": TimeOfDay(hour: 19, minute: 0),
+    "Night": TimeOfDay(hour: 21, minute: 0),
+  };
+  int notifCounter = 0;
+  for (int day = 0; day < durationDays; day++) {
+    final date = startDate.add(Duration(days: day));
+    for (var t in times) {
+      final tod = namedTimes[t] ?? TimeOfDay(hour: 8, minute: 0);
+      final sched =
+          DateTime(date.year, date.month, date.day, tod.hour, tod.minute);
+      if (sched.isBefore(DateTime.now())) continue; // don't schedule in past
+
+      await AwesomeNotifications().createNotification(
+        content: NotificationContent(
+          id: idStart + notifCounter,
+          channelKey: 'medicine_reminder',
+          title: 'Medicine Reminder: $medicineName',
+          body: 'Advice: $advice\nTake at ${t}.',
+          notificationLayout: NotificationLayout.Default,
+        ),
+        schedule:
+            NotificationCalendar.fromDate(date: sched, preciseAlarm: true),
+      );
+      notifCounter++;
+    }
+  }
+}
 
 class DoctorProfileWithHistoryScreen extends StatelessWidget {
   final String doctorId;
@@ -12,6 +100,7 @@ class DoctorProfileWithHistoryScreen extends StatelessWidget {
     required this.doctorId,
     required this.patientId,
   });
+  static final Set<String> _scheduledMedicineKeys = {};
 
   @override
   Widget build(BuildContext context) {
@@ -104,6 +193,56 @@ class DoctorProfileWithHistoryScreen extends StatelessWidget {
                     }
 
                     final history = snap.data!.docs;
+
+                    WidgetsBinding.instance.addPostFrameCallback((_) async {
+                      int notifIdBase =
+                          100000; // Ensure unique IDs per prescription/medicine
+                      int notifCounter = 0;
+
+                      for (var doc in history) {
+                        final prescData = doc.data() as Map<String, dynamic>;
+                        final DateTime startDate =
+                            (prescData['timestamp'] as Timestamp?)?.toDate() ??
+                                DateTime.now();
+                        final meds = prescData['medicines'] ?? [];
+                        for (var med in meds) {
+                          final String medName = med['medicine'] ?? 'Medicine';
+                          final String advice =
+                              med['advice'] ?? 'Follow instructions';
+                          final times = (med['times'] is List)
+                              ? List<String>.from(med['times'])
+                              : <String>[];
+
+                          // Parse duration from dosage text e.g. "2 times for 30 days"
+                          int duration = 1; // default
+                          final dosage = med['dosage']?.toString() ?? '';
+                          final match =
+                              RegExp(r'(\\d+)\\s*days').firstMatch(dosage);
+                          if (match != null && match.groupCount >= 1) {
+                            duration = int.tryParse(match.group(1) ?? '') ?? 1;
+                          } else {
+                            duration =
+                                1; // If parsing fails, schedule just once
+                          }
+
+                          // Create a unique key to avoid duplicate scheduling in this session
+                          String medicineKey =
+                              "$startDate|$medName|$advice|${times.join(',')}|$duration";
+                          if (!_scheduledMedicineKeys.contains(medicineKey)) {
+                            _scheduledMedicineKeys.add(medicineKey);
+                            await scheduleMedicineRemindersForPeriod(
+                              idStart: notifIdBase + notifCounter * 1000,
+                              medicineName: medName,
+                              advice: advice,
+                              startDate: startDate,
+                              times: times,
+                              durationDays: duration,
+                            );
+                          }
+                          notifCounter++;
+                        }
+                      }
+                    });
 
                     return ListView.separated(
                       padding: const EdgeInsets.all(16),

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
+import 'package:medisafe/core/components.dart';
+import 'package:medisafe/core/primary_color.dart';
 import 'package:medisafe/features/home/patient/presentation/screens/appointmentsScreen.dart';
 import 'package:medisafe/models/doctor_model.dart';
 
@@ -248,8 +250,11 @@ class _AppointmentPageState extends State<AppointmentPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      //backgroundColor: AppColors.appColor,
       appBar: AppBar(
-        title: const Text('Book Appointment'),
+        title: Pacifico(text: "Appointment", size: 25.0),
+        centerTitle: true,
+        backgroundColor: AppColors.primaryColor,
       ),
       body: SingleChildScrollView(
         child: Padding(
@@ -281,9 +286,11 @@ class _AppointmentPageState extends State<AppointmentPage> {
               const SizedBox(height: 20),
               if (selectedDateIndex != -1) _buildSlotSelector(),
               const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: _bookAppointment,
-                child: const Text('Book Appointment'),
+              Center(
+                child: ElevatedButton(
+                  onPressed: _bookAppointment,
+                  child: const Text('Book Appointment'),
+                ),
               ),
             ],
           ),

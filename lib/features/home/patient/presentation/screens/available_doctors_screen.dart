@@ -58,14 +58,33 @@ class AvailableDoctorsScreen extends ConsumerWidget {
     );
   }
 
+  // Widget _buildDoctorsGrid(List<Doctor> doctors, int crossAxisCount) {
+  //   return Padding(
+  //     padding: const EdgeInsets.symmetric(horizontal: 16),
+  //     child: GridView.builder(
+  //       padding: const EdgeInsets.only(top: 16),
+  //       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+  //         crossAxisCount: crossAxisCount, // Dynamic column count
+  //         childAspectRatio: 0.65, // Adjust for better layout
+  //         mainAxisSpacing: 16,
+  //         crossAxisSpacing: 16,
+  //       ),
+  //       itemCount: doctors.length,
+  //       itemBuilder: (context, index) {
+  //         return _buildDoctorCard(context, doctors[index]);
+  //       },
+  //     ),
+  //   );
+  // }
   Widget _buildDoctorsGrid(List<Doctor> doctors, int crossAxisCount) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: GridView.builder(
-        padding: const EdgeInsets.only(top: 16),
+        padding:
+            const EdgeInsets.only(top: 16, bottom: 16), // Add bottom padding
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: crossAxisCount, // Dynamic column count
-          childAspectRatio: 0.65, // Adjust for better layout
+          childAspectRatio: 0.7, // Slightly taller for better headroom
           mainAxisSpacing: 16,
           crossAxisSpacing: 16,
         ),
@@ -92,34 +111,44 @@ class AvailableDoctorsScreen extends ConsumerWidget {
         color: AppColors.primaryColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         elevation: 4,
-        child: Padding(
-          padding: const EdgeInsets.all(12.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              CircleAvatar(
-                backgroundImage: NetworkImage(doctor.profileImageUrl),
-                radius: 40, // Profile image size
-              ),
-              const SizedBox(height: 12),
-              Text(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.start,
+          children: [
+            const SizedBox(height: 16),
+            CircleAvatar(
+              backgroundImage: NetworkImage(doctor.profileImageUrl),
+              radius: 40,
+            ),
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Text(
                 'Dr. ${doctor.name}',
                 style:
                     const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 4),
-              Text(
+            ),
+            const SizedBox(height: 4),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Text(
                 doctor.specialization,
                 style: const TextStyle(color: Colors.blueGrey, fontSize: 14),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 8),
-              _buildDetailRow(
-                  Icons.star, '${doctor.experience} Years Experience'),
-              _buildDetailRow(Icons.people, '${doctor.patients} Patients'),
-            ],
-          ),
+            ),
+            const SizedBox(height: 8),
+            _buildDetailRow(
+                Icons.star, '${doctor.experience} Years Experience'),
+            _buildDetailRow(Icons.people, '${doctor.patients} Patients'),
+            const Spacer(), // Push badge content to bottom
+          ],
         ),
       ),
     );

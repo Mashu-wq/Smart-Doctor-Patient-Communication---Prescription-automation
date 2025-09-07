@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:intl/intl.dart'; // Import intl for time formatting
+import 'package:medisafe/core/components.dart';
+import 'package:medisafe/core/primary_color.dart';
 import 'package:medisafe/features/home/doctor/presentation/providers/rating_providers.dart';
 
 class ReviewsPage extends ConsumerWidget {
@@ -16,8 +18,9 @@ class ReviewsPage extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Ratings and Reviews'),
-        backgroundColor: Colors.purpleAccent,
+        title: Pacifico(text: "Rating and Reviews", size: 25.0),
+        centerTitle: true,
+        backgroundColor: AppColors.primaryColor,
       ),
       body: ratingsState.when(
         data: (ratings) => _buildReviewsContent(context, ratings),

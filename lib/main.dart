@@ -4,7 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:medisafe/constants.dart';
 import 'package:medisafe/features/splash/presentation/splash_screen.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:medisafe/firebase_options.dart'; // Import Firebase
+import 'package:medisafe/firebase_options.dart';
+
+import 'features/notification_service.dart'; // Import Firebase
 // Import Firebase options for platform
 
 void main() async {
@@ -18,10 +20,12 @@ void main() async {
     'resource://drawable/res_app_icon',
     [
       NotificationChannel(
-        channelKey: 'medication_reminder',
-        channelName: 'Medication Reminders',
+        channelKey: 'medicine_reminder',
+        channelName: 'Medicine Reminder Notifications',
         channelDescription: 'Reminders for taking medicines',
         defaultColor: Colors.teal,
+        importance: NotificationImportance.High,
+        channelShowBadge: true,
         ledColor: Colors.white,
       )
     ],

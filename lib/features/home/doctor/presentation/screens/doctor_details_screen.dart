@@ -1,5 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_sslcommerz/model/SSLCSdkType.dart';
+import 'package:flutter_sslcommerz/model/SSLCTransactionInfoModel.dart';
+import 'package:flutter_sslcommerz/model/SSLCommerzInitialization.dart';
+import 'package:flutter_sslcommerz/model/SSLCurrencyType.dart';
+import 'package:flutter_sslcommerz/sslcommerz.dart';
 import 'package:medisafe/core/components.dart';
 import 'package:medisafe/core/primary_color.dart';
 import 'package:medisafe/features/authentication/patient/presentation/screens/appointment_page.dart';
@@ -63,7 +68,7 @@ class DoctorDetailsScreen extends StatelessWidget {
                     const SizedBox(height: 16),
 
                     // Call, Video & Message Buttons
-                    _buildActionButtons(context),
+                    //_buildActionButtons(context),
 
                     const SizedBox(height: 16),
                     const Divider(),
@@ -85,7 +90,7 @@ class DoctorDetailsScreen extends StatelessWidget {
                     const SizedBox(height: 30),
 
                     // Reviews Section
-                    _buildReviewsSection(),
+                    _buildReviewsSection(context),
                   ],
                 ),
               ),
@@ -96,41 +101,25 @@ class DoctorDetailsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildActionButtons(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: [
-        _buildActionButton(
-          icon: Icons.call,
-          label: 'Voice Call',
-          color: Colors.blue,
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => VoiceCallScreen(
-                  doctor: doctor,
-                  patientId: patiendId,
-                ),
-              ),
-            );
-          },
-        ),
-        _buildActionButton(
-          icon: Icons.video_call,
-          label: 'Video Call',
-          color: Colors.purple,
-          onPressed: () {},
-        ),
-        _buildActionButton(
-          icon: Icons.message,
-          label: 'Message',
-          color: Colors.orange,
-          onPressed: () {},
-        ),
-      ],
-    );
-  }
+  // Widget _buildActionButtons(BuildContext context) {
+  //   return Row(
+  //     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+  //     children: [
+  //       _buildActionButton(
+  //         icon: Icons.call,
+  //         label: 'Voice Call',
+  //         color: Colors.blue,
+  //         onPressed: () {},
+  //       ),
+  //       _buildActionButton(
+  //         icon: Icons.video_call,
+  //         label: 'Video Call',
+  //         color: Colors.purple,
+  //         onPressed: () {},
+  //       ),
+  //     ],
+  //   );
+  // }
 
   Widget _buildBiographySection() {
     return Column(
@@ -153,74 +142,12 @@ class DoctorDetailsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildDoctorStats(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: [
-        _buildStatistic('Patients', doctor.patients.toString()),
-        _buildStatistic('Experience', '${doctor.experience} Years'),
-        _buildDynamicReviewStatistic(context, doctor.id),
-      ],
-    );
-  }
-
-  Widget _buildBookAppointmentButton(BuildContext context) {
-    return ElevatedButton(
-      onPressed: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => AppointmentPage(doctor: doctor),
-          ),
-        );
-      },
-      style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.blue,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
-      ),
-      child: const Text(
-        'Book an Appointment',
-        style: TextStyle(fontSize: 16),
-      ),
-    );
-  }
-
-  Widget _buildReviewsSection() {
-    return Column(
-      children: [
-        const Text(
-          'Reviews',
-          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 16),
-        RatingForm(doctorId: doctor.id),
-      ],
-    );
-  }
-
-  Widget _buildStatistic(String label, String value) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        Text(label, style: const TextStyle(fontSize: 14, color: Colors.grey)),
-      ],
-    );
-  }
-
-  // Dynamically fetch and display the review count
-  Widget _buildDynamicReviewStatistic(BuildContext context, String doctorId) {
+  Widget _buildDynamicPatientCountStatistic(String doctorId) {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
-          .collection('reviews')
+          .collection('appointments')
           .where('doctorId', isEqualTo: doctorId)
+          .where('status', isEqualTo: 'Visited')
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -230,37 +157,230 @@ class DoctorDetailsScreen extends StatelessWidget {
           return const Text('Error');
         }
 
-        final reviewCount = snapshot.data?.docs.length ?? 0;
+        // Collect unique patient IDs from visited appointments
+        final seenPatients = <String>{};
+        if (snapshot.hasData) {
+          for (final doc in snapshot.data!.docs) {
+            final data = doc.data() as Map<String, dynamic>;
+            if (data['userId'] != null) {
+              seenPatients.add(data['userId'] as String);
+            }
+          }
+        }
 
-        return GestureDetector(
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => ReviewsPage(doctorId: doctorId),
+        return Column(
+          children: [
+            Text(
+              '${seenPatients.length}',
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
               ),
-            );
-          },
-          child: Column(
-            children: [
-              Text(
-                '$reviewCount',
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.blue,
-                ),
-              ),
-              const Text(
-                'Reviews',
-                style: TextStyle(fontSize: 14, color: Colors.blueAccent),
-              ),
-            ],
-          ),
+            ),
+            const Text(
+              'Patients',
+              style: TextStyle(fontSize: 14, color: Colors.grey),
+            ),
+          ],
         );
       },
     );
   }
+
+  Widget _buildDoctorStats(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: [
+        _buildDynamicPatientCountStatistic(doctor.id),
+        _buildStatistic('Experience', '${doctor.experience} Years'),
+        _buildDynamicReviewStatistic(context, doctor.id),
+      ],
+    );
+  }
+
+  Widget _buildBookAppointmentButton(BuildContext context) {
+    return ElevatedButton(
+      onPressed: () async {
+        final amountToPay = 100.0; // Specify your appointment fee here
+
+        // SSLCOMMERZ payment setup
+        Sslcommerz sslcommerz = Sslcommerz(
+          initializer: SSLCommerzInitialization(
+            ipn_url: "https://your-ipn-url.com", // optional IPN url
+            multi_card_name: "",
+            currency: SSLCurrencyType.BDT,
+            product_category: "Appointment",
+            sdkType: SSLCSdkType.TESTBOX, // Change to LIVE in production
+            store_id: "zeroo6890512f607a2", // replace with valid store id
+            store_passwd:
+                "zeroo6890512f607a2@ssl", // replace with valid store password
+            total_amount: amountToPay,
+            tran_id: "tran_${DateTime.now().millisecondsSinceEpoch}",
+          ),
+        );
+
+        try {
+          SSLCTransactionInfoModel result = await sslcommerz.payNow();
+
+          final paymentStatus = result.status?.toLowerCase();
+          if (paymentStatus == 'success' || paymentStatus == 'valid') {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => AppointmentPage(doctor: doctor),
+              ),
+            );
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                  content: Text('Payment successful. Proceed to booking.')),
+            );
+          } else if (paymentStatus == 'failed') {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                  content: Text('Payment failed. Please try again.')),
+            );
+          } else if (paymentStatus == 'closed') {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Payment cancelled.')),
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Payment status: ${result.status}')),
+            );
+          }
+        } catch (e) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Payment error: $e')),
+          );
+        }
+      },
+      style: ElevatedButton.styleFrom(
+        backgroundColor: AppColors.buttonColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+      child: const Text(
+        'Book an Appointment',
+        style: TextStyle(fontSize: 16, color: AppColors.primaryColor),
+      ),
+    );
+  }
+
+  /// Builds the Reviews section header with live review count
+  Widget _buildReviewsSection(BuildContext context) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('reviews')
+          .where('doctorId', isEqualTo: doctor.id)
+          .snapshots(),
+      builder: (context, snapshot) {
+        int reviewCount = 0;
+        if (snapshot.hasData) {
+          reviewCount = snapshot.data!.docs.length;
+        }
+
+        return Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  'Reviews',
+                  style: const TextStyle(
+                      fontSize: 24, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(width: 8),
+                if (reviewCount > 0)
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryColor,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      reviewCount.toString(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Your existing RatingForm widget below will show ratings and allow submission
+            RatingForm(doctorId: doctor.id),
+          ],
+        );
+      },
+    );
+  }
+}
+
+Widget _buildStatistic(String label, String value) {
+  return Column(
+    children: [
+      Text(
+        value,
+        style: const TextStyle(
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      Text(label, style: const TextStyle(fontSize: 14, color: Colors.grey)),
+    ],
+  );
+}
+
+// Dynamically fetch and display the review count
+Widget _buildDynamicReviewStatistic(BuildContext context, String doctorId) {
+  return StreamBuilder<QuerySnapshot>(
+    stream: FirebaseFirestore.instance
+        .collection('reviews')
+        .where('doctorId', isEqualTo: doctorId)
+        .snapshots(),
+    builder: (context, snapshot) {
+      if (snapshot.connectionState == ConnectionState.waiting) {
+        return const Text('Loading...');
+      }
+      if (snapshot.hasError) {
+        return const Text('Error');
+      }
+
+      final reviewCount = snapshot.data?.docs.length ?? 0;
+
+      return GestureDetector(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ReviewsPage(doctorId: doctorId),
+            ),
+          );
+        },
+        child: Column(
+          children: [
+            Text(
+              "See",
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.blue,
+              ),
+            ),
+            const Text(
+              'Reviews',
+              style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.blueAccent,
+                  fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+      );
+    },
+  );
 }
 
 Widget _buildActionButton({

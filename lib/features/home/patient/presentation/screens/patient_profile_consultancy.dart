@@ -1,15 +1,57 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:medisafe/core/primary_color.dart';
+import 'package:medisafe/features/home/patient/presentation/screens/call_screen/call_screen.dart';
 import 'package:medisafe/features/home/patient/presentation/screens/prescription/prescribe_medicine.dart';
+
+import 'call_screen/doctor_call_wait_screen.dart';
+
+Future<void> initiateCallToPatient({
+  required BuildContext context,
+  required String doctorId,
+  required String doctorName,
+  required String patientId,
+  required String patientName,
+  required bool isVideoCall,
+}) async {
+  final callId = patientId; // or a more unique value!
+
+  await FirebaseFirestore.instance
+      .collection('patients')
+      .doc(patientId)
+      .update({
+    'incoming_call': {
+      'call_id': callId,
+      'from_doctor_id': doctorId,
+      'from_doctor_name': doctorName,
+      'call_type': isVideoCall ? 'video' : 'voice',
+      'timestamp': FieldValue.serverTimestamp(),
+      'call_status': 'ringing',
+    }
+  });
+
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => DoctorCallWaitScreen(
+        patientId: patientId,
+        doctorId: doctorId,
+        doctorName: doctorName,
+        callId: callId,
+        isVideoCall: isVideoCall,
+      ),
+    ),
+  );
+}
 
 class PatientProfileForConsultancy extends ConsumerWidget {
   final String patientId;
 
-  const PatientProfileForConsultancy({super.key, required this.patientId});
+  PatientProfileForConsultancy({super.key, required this.patientId});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -113,12 +155,19 @@ class PatientProfileForConsultancy extends ConsumerWidget {
     );
   }
 
+  final String doctorUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+
   Widget _buildPrescriptionHistory(BuildContext context) {
+    // Get logged-in doctor's UID
+    final doctorUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('patients')
           .doc(patientId)
           .collection('prescriptions')
+          .where('doctorId',
+              isEqualTo: doctorUid) // <--- FILTER BY THIS DOCTOR ONLY
           .orderBy('timestamp', descending: true)
           .snapshots(),
       builder: (context, snapshot) {
@@ -126,7 +175,7 @@ class PatientProfileForConsultancy extends ConsumerWidget {
           return const Center(child: CircularProgressIndicator());
         }
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return const Text("No prescriptions added yet.");
+          return const Text("No prescriptions added yet by you.");
         }
 
         final prescriptionDocs = snapshot.data!.docs;
@@ -139,6 +188,7 @@ class PatientProfileForConsultancy extends ConsumerWidget {
             final data = prescriptionDocs[index].data() as Map<String, dynamic>;
             final medicines = data['medicines'] as List<dynamic>? ?? [];
             final timestamp = data['timestamp'] as Timestamp?;
+            final doctorName = data['doctorName'] ?? 'Unknown Doctor';
 
             final dateTime = timestamp?.toDate() ?? DateTime.now();
             final dateStr = dateTime.toLocal().toString().split(' ')[0];
@@ -155,6 +205,15 @@ class PatientProfileForConsultancy extends ConsumerWidget {
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      "Prescribed by: $doctorName",
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w500,
+                        color: Colors.blueGrey,
+                        fontSize: 15,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -191,10 +250,13 @@ class PatientProfileForConsultancy extends ConsumerWidget {
   }
 
   Widget _buildAppointmentList(BuildContext context) {
+    // Add the current doctor's UID filter here:
+    final doctorUid = FirebaseAuth.instance.currentUser?.uid ?? '';
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('appointments')
           .where('userId', isEqualTo: patientId)
+          .where('doctorId', isEqualTo: doctorUid)
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -206,18 +268,21 @@ class PatientProfileForConsultancy extends ConsumerWidget {
 
         final now = DateTime.now();
 
+        // Filter only pending and upcoming appointments
         final filteredDocs = snapshot.data!.docs.where((doc) {
           final data = doc.data() as Map<String, dynamic>;
           final status = data['status'] ?? '';
           final dateStr = data['date'] ?? '';
           final timeStr = data['timeSlot'] ?? '';
-          if (status != 'Pending') return false;
+
+          if (status != 'Pending' || dateStr.isEmpty || timeStr.isEmpty)
+            return false;
 
           try {
-            final fullStr = "$dateStr $timeStr";
-            final appointmentTime =
-                DateFormat("yyyy-MM-dd HH:mm").parse(fullStr);
-            return appointmentTime.isAfter(now);
+            final appointmentDateTime =
+                DateFormat('yyyy-MM-dd h:mm a').parse('$dateStr $timeStr');
+            return now
+                .isBefore(appointmentDateTime.add(const Duration(minutes: 30)));
           } catch (_) {
             return false;
           }
@@ -237,6 +302,8 @@ class PatientProfileForConsultancy extends ConsumerWidget {
             final date = data['date'] ?? 'N/A';
             final timeSlot = data['timeSlot'] ?? 'N/A';
             final status = data['status'] ?? 'Scheduled';
+            final doctorId = data['doctorId'] ?? '';
+            final doctorName = data['doctorName'] ?? '';
 
             return Card(
               color: Colors.white,
@@ -245,24 +312,31 @@ class PatientProfileForConsultancy extends ConsumerWidget {
                 title: Text("Date: $date\nTime: $timeSlot"),
                 subtitle: Text("Status: $status"),
                 trailing: ElevatedButton(
-                  onPressed: () {
+                  child: const Text("Visit"),
+                  style:
+                      ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+                  onPressed: () async {
+                    // 1. Update only this appointment document status to "Visited"
+                    await FirebaseFirestore.instance
+                        .collection('appointments')
+                        .doc(doc.id)
+                        .update({'status': 'Visited'});
+
+                    // 2. Optionally add a notification here (if you want)
+
+                    // 3. Navigate to PrescriptionFormScreen with needed params
                     Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (context) => PrescriptionFormScreen(
                           patientId: patientId,
                           appointmentId: doc.id,
-                          doctorId: data[
-                              'doctorId'], // Ensure doctorId is fetched properly from appointment doc
-                          doctorName:
-                              data['doctorName'], // Also fetch doctorName
+                          doctorId: doctorId,
+                          doctorName: doctorName,
                         ),
                       ),
                     );
                   },
-                  style:
-                      ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-                  child: const Text("Visit"),
                 ),
               ),
             );
@@ -273,23 +347,51 @@ class PatientProfileForConsultancy extends ConsumerWidget {
   }
 
   Widget _buildActionButtons(
-      BuildContext context, String callerName, String callerImageUrl) {
+      BuildContext context, String patientName, String patientId) {
+    final doctorUser = FirebaseAuth.instance.currentUser!;
+    final doctorId = doctorUser.uid;
+    final doctorName = doctorUser.displayName ?? 'Doctor';
+
+    // Use a unique channel ID for the call (e.g., patientId or doctorId_patientId)
+    final callId = patientId; // Or doctorId + '_' + patientId
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         _ActionButton(
-          icon: FontAwesomeIcons.phone,
-          label: "Voice Call",
-          color: Colors.blue,
-          onPressed: () {},
-        ),
-        const SizedBox(width: 40),
-        _ActionButton(
           icon: FontAwesomeIcons.video,
           label: "Video Call",
-          color: Colors.purple,
-          onPressed: () {},
+          color: Colors.blue,
+          onPressed: () {
+            initiateCallToPatient(
+              context: context,
+              doctorId: doctorId,
+              doctorName: doctorName,
+              patientId: patientId,
+              patientName: patientName,
+              isVideoCall: true, // for video, false for voice
+            );
+          },
         ),
+        // const SizedBox(width: 40),
+        // _ActionButton(
+        //   icon: FontAwesomeIcons.video,
+        //   label: "Video Call",
+        //   color: Colors.purple,
+        //   onPressed: () {
+        //     Navigator.push(
+        //       context,
+        //       MaterialPageRoute(
+        //         builder: (_) => CallScreen(
+        //           userId: doctorId,
+        //           userName: doctorName,
+        //           callId: callId,
+        //           isVideoCall: true,
+        //         ),
+        //       ),
+        //     );
+        //   },
+        // ),
       ],
     );
   }

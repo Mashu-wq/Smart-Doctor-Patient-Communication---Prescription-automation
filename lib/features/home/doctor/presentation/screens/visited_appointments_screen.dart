@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 class VisitedAppointmentsScreen extends StatelessWidget {
@@ -6,6 +7,7 @@ class VisitedAppointmentsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final String currentDoctorId = FirebaseAuth.instance.currentUser?.uid ?? '';
     return Scaffold(
       appBar: AppBar(
         title: const Text("Visited Appointments"),
@@ -16,8 +18,8 @@ class VisitedAppointmentsScreen extends StatelessWidget {
         child: StreamBuilder<QuerySnapshot>(
           stream: FirebaseFirestore.instance
               .collection('appointments')
-              .where('status',
-                  isEqualTo: 'Visited') // Filter visited appointments
+              .where('status', isEqualTo: 'Visited')
+              .where('doctorId', isEqualTo: currentDoctorId)
               .snapshots(),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {

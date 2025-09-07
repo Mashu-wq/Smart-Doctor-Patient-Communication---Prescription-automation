@@ -19,7 +19,7 @@ class _DoctorMainScreenState extends ConsumerState<DoctorMainScreen> {
   // List of all screens except ProfileScreen (it will be dynamically created)
   final List<Widget> _screens = [
     const HomeScreen(),
-    const RejectedAppointmentsScreen(),
+    //const RejectedAppointmentsScreen(),
     const VisitedAppointmentsScreen(),
   ];
 
@@ -30,7 +30,7 @@ class _DoctorMainScreenState extends ConsumerState<DoctorMainScreen> {
     });
 
     // Dynamically navigate to ProfileScreen when the "Profile" tab is selected
-    if (index == 3) {
+    if (index == 2) {
       final doctorId = FirebaseAuth.instance.currentUser?.uid ?? '';
       if (doctorId.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -58,7 +58,7 @@ class _DoctorMainScreenState extends ConsumerState<DoctorMainScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _selectedIndex < 3 ? _screens[_selectedIndex] : Container(),
+      body: _selectedIndex < 2 ? _screens[_selectedIndex] : Container(),
       bottomNavigationBar: BottomNavigationBar(
         selectedItemColor: Colors.purpleAccent,
         unselectedItemColor: Colors.grey,
@@ -66,7 +66,7 @@ class _DoctorMainScreenState extends ConsumerState<DoctorMainScreen> {
         onTap: _onItemTapped,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.pending), label: 'Pending'),
+          //BottomNavigationBarItem(icon: Icon(Icons.block), label: 'Rejected'),
           BottomNavigationBarItem(
               icon: Icon(Icons.check_circle), label: 'Visited'),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),

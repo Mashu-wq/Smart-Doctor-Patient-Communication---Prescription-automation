@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,8 +10,41 @@ import 'package:medisafe/core/primary_color.dart';
 import 'package:medisafe/features/home/patient/presentation/screens/patient_profile_consultancy.dart';
 import 'package:medisafe/providers.dart';
 
-class HomeScreen extends ConsumerWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
+  @override
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  Timer? _expireTimer;
+  String? doctorId;
+
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(_startAppointmentCleaner);
+  }
+
+  @override
+  void dispose() {
+    _expireTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startAppointmentCleaner() {
+    doctorId = FirebaseAuth.instance.currentUser?.uid;
+    if (doctorId == null) return;
+
+    // Trigger once immediately
+    ref.read(expiredAppointmentsCleanerProvider(doctorId!).future);
+
+    // Then every 1 minute
+    _expireTimer?.cancel();
+    _expireTimer = Timer.periodic(const Duration(minutes: 1), (timer) {
+      ref.read(expiredAppointmentsCleanerProvider(doctorId!).future);
+    });
+  }
 
   Future<void> _rejectExpiredAppointments(String doctorId) async {
     final now = DateTime.now();
@@ -36,7 +71,7 @@ class HomeScreen extends ConsumerWidget {
           time.hour,
           time.minute,
         );
-        // If 30min have passed since appointment start and it's still pending, mark as "Rejected"
+        // Mark as "Rejected" if 30+ min has passed
         if (now.isAfter(appointmentStart.add(const Duration(minutes: 30)))) {
           await doc.reference.update({'status': 'Rejected'});
         }
@@ -45,12 +80,13 @@ class HomeScreen extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final doctorName = ref.watch(doctorNameProvider);
-    final String doctorId = FirebaseAuth.instance.currentUser?.uid ?? '';
+    //final String doctorId = FirebaseAuth.instance.currentUser?.uid ?? '';
+    doctorId ??= FirebaseAuth.instance.currentUser?.uid ?? '';
 
-    // Trigger cleanup of expired appointments (safe for small user collections)
-    _rejectExpiredAppointments(doctorId);
+    // Cleanup expired appointments
+    //_rejectExpiredAppointments(doctorId!);
 
     return Scaffold(
       backgroundColor: AppColors.appColor,
@@ -94,70 +130,52 @@ class HomeScreen extends ConsumerWidget {
                   if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
                     return const Center(child: Text('No appointments found.'));
                   }
+                  final now = DateTime.now();
 
-                  // Filter: pending and not expired
                   final appointments = snapshot.data!.docs.where((doc) {
                     final data = doc.data() as Map<String, dynamic>;
                     if (data['status'] != 'Pending') return false;
-
-                    final String dateStr = data['date'] ?? '';
-                    final String timeStr = data['timeSlot'] ?? '';
+                    final dateStr = data['date'] ?? '';
+                    final timeStr = data['timeSlot'] ?? '';
                     if (dateStr.isEmpty || timeStr.isEmpty) return false;
 
                     try {
-                      final date = DateFormat('yyyy-MM-dd').parse(dateStr);
-                      final time = DateFormat('h:mm a').parse(timeStr);
-                      final appointmentStart = DateTime(
-                        date.year,
-                        date.month,
-                        date.day,
-                        time.hour,
-                        time.minute,
-                      );
-                      // Only show if within 30 minutes window
-                      return DateTime.now().isBefore(
-                          appointmentStart.add(const Duration(minutes: 30)));
-                    } catch (_) {
-                      return false;
+                      final dt = DateFormat('yyyy-MM-dd h:mm a')
+                          .parse('$dateStr $timeStr');
+                      // Show if the appointment ends in the future (current before start+30min)
+                      return now.isBefore(dt.add(const Duration(minutes: 30)));
+                    } catch (e) {
+                      // If parsing fails, include as a fallback only if the date is today (for safety)
+                      try {
+                        final onlyDate =
+                            DateFormat('yyyy-MM-dd').parse(dateStr);
+                        return onlyDate.year == now.year &&
+                            onlyDate.month == now.month &&
+                            onlyDate.day == now.day;
+                      } catch (_) {
+                        return false;
+                      }
                     }
                   }).toList();
 
-                  // ---- SORTING by (date, time) ascending ----
-                  List<QueryDocumentSnapshot> sortedAppointments =
-                      List.from(appointments);
-                  sortedAppointments.sort((a, b) {
-                    final aData = a.data() as Map<String, dynamic>;
-                    final bData = b.data() as Map<String, dynamic>;
-                    final aDateStr = aData['date'] ?? '';
-                    final bDateStr = bData['date'] ?? '';
-                    final aTimeStr = aData['timeSlot'] ?? '00:00 AM';
-                    final bTimeStr = bData['timeSlot'] ?? '00:00 AM';
-
-                    DateTime aDateTime, bDateTime;
+                  appointments.sort((a, b) {
+                    final ad = a.data() as Map<String, dynamic>;
+                    final bd = b.data() as Map<String, dynamic>;
                     try {
-                      final aDate = DateFormat('yyyy-MM-dd').parse(aDateStr);
-                      final aTime = DateFormat('h:mm a').parse(aTimeStr);
-                      aDateTime = DateTime(aDate.year, aDate.month, aDate.day,
-                          aTime.hour, aTime.minute);
+                      final adt = DateFormat('yyyy-MM-dd h:mm a')
+                          .parse('${ad['date']} ${ad['timeSlot']}');
+                      final bdt = DateFormat('yyyy-MM-dd h:mm a')
+                          .parse('${bd['date']} ${bd['timeSlot']}');
+                      return adt.compareTo(bdt);
                     } catch (_) {
-                      aDateTime = DateTime(1970);
+                      return 0;
                     }
-                    try {
-                      final bDate = DateFormat('yyyy-MM-dd').parse(bDateStr);
-                      final bTime = DateFormat('h:mm a').parse(bTimeStr);
-                      bDateTime = DateTime(bDate.year, bDate.month, bDate.day,
-                          bTime.hour, bTime.minute);
-                    } catch (_) {
-                      bDateTime = DateTime(1970);
-                    }
-
-                    return aDateTime.compareTo(bDateTime);
                   });
 
-                  // ---- GROUP by date AFTER sorting ----
+                  // Group by date for display
                   final Map<String, List<QueryDocumentSnapshot>>
                       groupedAppointments = {};
-                  for (var doc in sortedAppointments) {
+                  for (var doc in appointments) {
                     final date = (doc.data() as Map<String, dynamic>)['date'] ??
                         'Unknown';
                     groupedAppointments.putIfAbsent(date, () => []);
@@ -172,13 +190,13 @@ class HomeScreen extends ConsumerWidget {
                       } catch (_) {
                         return a.compareTo(b);
                       }
-                    }); // Sorted by date string
+                    });
 
                   if (appointments.isEmpty) {
                     return const Center(child: Text('No appointments found.'));
                   }
 
-                  // UI Display
+                  // UI: Section per date, sorted, each booking unique and serial
                   return ListView.builder(
                     itemCount: sortedDates.length,
                     itemBuilder: (context, index) {

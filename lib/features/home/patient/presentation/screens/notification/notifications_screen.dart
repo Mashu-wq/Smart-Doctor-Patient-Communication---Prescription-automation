@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:medisafe/core/components.dart';
 import 'package:medisafe/core/primary_color.dart';
 import 'package:medisafe/features/home/patient/presentation/screens/doctor_profile_history_screen.dart';
@@ -8,21 +9,20 @@ import 'package:medisafe/features/home/patient/presentation/screens/doctor_profi
 class NotificationScreen extends StatelessWidget {
   const NotificationScreen({super.key});
 
-  IconData _getNotificationIcon(String type) {
+  IconData _getIconForType(String type) {
     switch (type) {
       case 'visited_appointment':
-        return Icons.health_and_safety; // 🩺 More medical feel
+        return Icons.health_and_safety;
       case 'new_message':
-        return Icons.chat_bubble_outline; // ✉️ Looks like a real chat
+        return Icons.chat_bubble_outline;
       case 'reminder':
-        return Icons.schedule; // ⏰ Reminder clock
+        return Icons.schedule;
       default:
-        return Icons
-            .notifications_active_outlined; // 🔔 Better notification icon
+        return Icons.notifications_active_outlined;
     }
   }
 
-  Color _getIconColor(String type) {
+  Color _getColorForType(String type) {
     switch (type) {
       case 'visited_appointment':
         return Colors.green;
@@ -37,6 +37,8 @@ class NotificationScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final String currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
+
     return Scaffold(
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
@@ -47,6 +49,9 @@ class NotificationScreen extends StatelessWidget {
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection('notifications')
+            .where('userId',
+                isEqualTo:
+                    currentUserId) // Only notifications for logged-in user
             .orderBy('timestamp', descending: true)
             .snapshots(),
         builder: (context, snapshot) {
@@ -83,8 +88,7 @@ class NotificationScreen extends StatelessWidget {
                       ),
                     );
                   } else {
-                    debugPrint(
-                        "⚠️ doctorId or patientId missing in notification.");
+                    debugPrint('Notification missing doctorId or patientId');
                   }
                 },
                 child: Card(
@@ -99,10 +103,10 @@ class NotificationScreen extends StatelessWidget {
                         horizontal: 20, vertical: 12),
                     leading: CircleAvatar(
                       radius: 25,
-                      backgroundColor: _getIconColor(type).withOpacity(0.1),
+                      backgroundColor: _getColorForType(type).withOpacity(0.1),
                       child: Icon(
-                        _getNotificationIcon(type),
-                        color: _getIconColor(type),
+                        _getIconForType(type),
+                        color: _getColorForType(type),
                         size: 30,
                       ),
                     ),
@@ -124,8 +128,11 @@ class NotificationScreen extends StatelessWidget {
                             ),
                           )
                         : null,
-                    trailing: const Icon(Icons.arrow_forward_ios_rounded,
-                        size: 18, color: Colors.grey),
+                    trailing: const Icon(
+                      Icons.arrow_forward_ios,
+                      size: 18,
+                      color: Colors.grey,
+                    ),
                   ),
                 ),
               );

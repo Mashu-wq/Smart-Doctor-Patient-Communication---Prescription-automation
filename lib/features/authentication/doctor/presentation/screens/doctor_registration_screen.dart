@@ -581,7 +581,7 @@ class _DoctorRegistrationScreenState
     'Cardiologist',
     'Neurologist',
     'General',
-    'Medicine'
+    'Orthopedic'
   ];
 
   Future<void> _pickImage() async {

@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:medisafe/features/home/doctor/data/repositories/category_repository.dart';
 import 'package:medisafe/features/home/doctor/data/repositories/doctor_repository.dart';
 import 'package:medisafe/features/home/doctor/domain/usecases/fetch_categories_usecase.dart';
@@ -87,4 +88,37 @@ final patientProfileProvider =
     FutureProvider.family<Patient, String>((ref, patientId) async {
   final repository = PatientRepository();
   return repository.fetchPatientProfile(patientId);
+});
+
+// Call this with doctor UID as argument.
+final expiredAppointmentsCleanerProvider =
+    FutureProvider.autoDispose.family<void, String>((ref, doctorId) async {
+  final now = DateTime.now();
+  final appointmentQuery = await FirebaseFirestore.instance
+      .collection('appointments')
+      .where('doctorId', isEqualTo: doctorId)
+      .where('isConsulted', isEqualTo: false)
+      .where('status', isEqualTo: 'Pending')
+      .get();
+
+  for (final doc in appointmentQuery.docs) {
+    final data = doc.data();
+    final String dateStr = data['date'] ?? '';
+    final String timeStr = data['timeSlot'] ?? '';
+    if (dateStr.isEmpty || timeStr.isEmpty) continue;
+    try {
+      final date = DateFormat('yyyy-MM-dd').parse(dateStr);
+      final time = DateFormat('h:mm a').parse(timeStr);
+      final appointmentStart = DateTime(
+        date.year,
+        date.month,
+        date.day,
+        time.hour,
+        time.minute,
+      );
+      if (now.isAfter(appointmentStart.add(const Duration(minutes: 30)))) {
+        await doc.reference.update({'status': 'Rejected'});
+      }
+    } catch (_) {}
+  }
 });

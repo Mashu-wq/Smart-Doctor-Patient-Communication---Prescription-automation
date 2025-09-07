@@ -132,8 +132,6 @@ class ProfileDetails extends StatelessWidget {
           _buildStatisticCard(
             title: "Appointments Overview",
             stats: [
-              _buildStatistic("Pending", profile.patients.toString()),
-              _buildStatistic("Visited", profile.patients.toString()),
               _buildStatistic("Total Patients", profile.patients.toString()),
               _buildStatistic("Experience", "${profile.experience} years"),
             ],
